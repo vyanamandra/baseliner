@@ -1,0 +1,30 @@
+- name: Check private_ip of each host
+  hosts: all
+
+  tasks:
+  #- name: get private ip of each of the hosts
+  #  register: "private_ip"
+  #  become: true
+  #  when: "'vm_ec2_nodes' in group_names"
+  #  ansible.builtin.shell:
+  #    cmd: hostname -i
+#
+  #- name: display the value of private_ip
+  #  debug:
+  #    var: "{{ ansible_play_hosts | map('extract', hostvars, 'private_ip') | map(attribute='stdout') | list }}"
+  #  run_once: yes
+
+  - name: stop consul 
+    become: true
+    shell:
+      cmd: systemctl stop consul
+
+  - name: remove tls dir
+    become: true
+    shell:
+      cmd: rm -rf /opt/consul/tls/*
+
+  - name: remove datadir
+    become: true
+    shell:
+      cmd: rm -rf /opt/consul/data-dir/*

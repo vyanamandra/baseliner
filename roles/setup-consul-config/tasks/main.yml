@@ -1,0 +1,193 @@
+---
+# tasks file for vm-consul-config
+
+- name: get private ip of each of the hosts
+  register: "private_ip"
+  become: true
+  when: 'DC_NODES in group_names'
+  ansible.builtin.shell:
+    cmd: hostname -i
+
+#- name: Print value of private_ip
+#  debug:
+#    var: private_ip
+#  when: 'DC_NODES in group_names'
+
+- name: Create /opt/consul/tls on all Consul nodes
+  become: true
+  ansible.builtin.file:
+    path: '/opt/consul/tls'
+    state: directory
+  when: 'DC_NODES in group_names'
+
+- name: Create /opt/consul/data-dir on all Consul nodes
+  become: true
+  ansible.builtin.file:
+    path: '/opt/consul/data-dir'
+    state: directory
+  when: 'DC_NODES in group_names'
+
+- name: Generate TLS Certifying Authority
+  become: true
+  when: 'DC_MGMT in group_names'
+  ansible.builtin.shell:
+    chdir: /opt/consul/tls/
+    cmd: consul tls ca create 
+
+- name: Generate TLS certificates for Servers
+  become: true
+  when: 'DC_MGMT in group_names'
+  ansible.builtin.shell:
+    chdir: /opt/consul/tls/
+    cmd: consul tls cert create -server -node '*' -dc {{ DC_NAME }}
+
+- name: Generate TLS certificate for Clients
+  become: true
+  when: 'DC_MGMT in group_names'
+  ansible.builtin.shell:
+    chdir: /opt/consul/tls/
+    cmd: consul tls cert create -client -dc {{ DC_NAME }}
+
+- name: Compress /opt/consul/tls/ directory
+  become: true
+  when: 'DC_MGMT in group_names'
+  community.general.archive:
+    path: '/opt/consul/tls/*'
+    dest: '/opt/consul/tls/tls.tgz'
+
+- name: Make local directory that we can then use to transfer to other remote servers
+  ansible.builtin.file:
+    recurse: true
+    path: 'output/tls/vm-ec2-{{ DC_NAME }}'
+    state: directory
+  when: 'DC_MGMT in group_names'
+  delegate_to: localhost
+
+- name: Fetch the zipped tls file from the remote host to local
+  become: true
+  ansible.builtin.fetch:
+    flat: yes
+    src: "/opt/consul/tls/tls.tgz"
+    dest: "{{ playbook_dir }}/output/tls/vm-ec2-{{ DC_NAME }}/"
+  when: 'DC_MGMT in group_names'
+
+- name: Extract the files in the remote /opt/consul/tls directory
+  become: true
+  ansible.builtin.unarchive:
+    copy: true
+    src: "{{ playbook_dir }}/output/tls/vm-ec2-{{ DC_NAME }}/tls.tgz"
+    dest: "/opt/consul/tls/"
+  when: 'DC_NODES in group_names'
+
+- name: Set group and owner to Consul over /etc/consul.d 
+  become: true
+  file: dest=/etc/consul.d owner=consul group=consul recurse=yes
+
+- name: Set group and owner to Consul over /opt/consul
+  become: true
+  file: dest=/opt/consul owner=consul group=consul recurse=yes
+
+- name: Arrive at an encrypt string to be used on all nodes of the cluster for gossip encryption
+  become: true
+  when: 'DC_MGMT in group_names'
+  ansible.builtin.shell:
+    chdir: /opt/consul/tls/
+    cmd: consul keygen
+  register: "gossip_encryption_token"
+
+#- name: Display all variables/facts known for a host
+#  debug:
+#    var: hostvars
+#  tags: debug_info
+#  when: 'DC_NODES in group_names'
+
+
+- name: Set gossip_encrypt_{{ DC_NORM }}
+  set_fact: 
+    gossip_encrypt_{{ DC_NORM }}: "{{ gossip_encryption_token['stdout'] }}"
+  when: 'DC_MGMT in group_names'
+
+#- name: Display all variables/facts known for a host
+#  debug:
+#    var: gossip_encrypt_{{ DC_NORM }}
+#  when: "DC_NODES in group_names"
+
+- name: Transfer Consul server config to the consul server nodes
+  template:
+    src: consul-server.config
+    dest: /etc/consul.d/consul.hcl
+    owner: consul
+    group: consul
+    mode: "u=rw,g=r,o=r"
+  when: "DC_SERVERS in group_names"
+  become: true
+
+- name: Transfer Consul client config to the consul client nodes
+  template:
+    src: consul-client.config
+    dest: /etc/consul.d/consul.hcl
+    owner: consul
+    group: consul
+    mode: "u=rw,g=r,o=r"
+  when: "DC_CLIENTS in group_names"
+  become: true
+
+- name: Replace single quotes with double quotes
+  become: true
+  when: "DC_NODES in group_names"
+  ansible.builtin.shell:
+    cmd: sed -i "s/'/\"/g" /etc/consul.d/consul.hcl
+
+- name: Restart the consul service in the servers
+  become: true
+  when: "DC_NODES in group_names"
+  ansible.builtin.systemd_service:
+    name: consul
+    state: restarted
+
+- name: Bootstrap consul
+  become: true
+  when: "DC_MGMT in group_names"
+  register: "bootstrap_token"
+  ansible.builtin.shell:
+    cmd: consul acl bootstrap  | grep ^SecretID | tr -d ' ' | awk -F ':' '{print $2}'
+  environment:
+    CONSUL_HTTP_SSL_VERIFY: false
+    CONSUL_HTTP_ADDR: "https://127.0.0.1:8501"
+  
+- debug: var=bootstrap_token
+
+- name: Copy the bootstrap token to ~/.bashrc of the root user
+  when: "DC_NODES in group_names"
+  become: true
+  ansible.builtin.shell:
+    cmd: echo "export CONSUL_HTTP_TOKEN={{ bootstrap_token.stdout }}" >> ~/.bashrc
+
+- name: Set CONSUL_HTTP_ADDR and CONSUL_HTTP_SSL_VERIFY values in .bashrc of root
+  when: "DC_NODES in group_names"
+  become: true
+  ansible.builtin.shell:
+    cmd: echo 'export CONSUL_HTTP_SSL_VERIFY=false\nexport CONSUL_HTTP_ADDR="https://127.0.0.1:8501"\n' >> ~/.bashrc
+
+- name: Generate agent tokens for each of the consul nodes and set them
+  when: "DC_NODES in group_names"
+  become: true
+  ansible.builtin.shell:
+    cmd: consul acl set-agent-token agent $(consul acl token create -node-identity=$(grep node_name /etc/consul.d/consul.hcl | cut -f 2 -d '=' | tr -d ' "'):{{ DC_NAME }} | grep ^SecretID | tr -d ' ' | awk -F ':' '{print $2}')
+  environment:
+    CONSUL_HTTP_TOKEN: "{{ bootstrap_token.stdout }}"
+    CONSUL_HTTP_SSL_VERIFY: false
+    CONSUL_HTTP_ADDR: "https://127.0.0.1:8501"
+
+- name: Query consul members
+  when: "DC_MGMT in group_names"
+  register: "consul_members"
+  ansible.builtin.shell:
+    cmd: consul members
+  environment:
+    CONSUL_HTTP_TOKEN: "{{ bootstrap_token.stdout }}"
+    CONSUL_HTTP_SSL_VERIFY: false
+    CONSUL_HTTP_ADDR: "https://127.0.0.1:8501"
+
+- debug: var=consul_members
+

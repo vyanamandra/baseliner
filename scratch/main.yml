@@ -1,0 +1,11 @@
+---
+- name: Starting the installation
+  hosts: localhost
+  tasks:
+
+  - name: Verify name resolution
+    include_role:
+      name: 'roles/check-dynamic-vars'
+    vars:
+        DC_ROLE: "consul"
+        DC: "dc1"

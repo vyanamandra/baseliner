@@ -1,0 +1,17 @@
+[vm_ec2_nodes]
+54.185.160.71 ansible_connection=ssh ansible_user=ubuntu ansible_private_key_file=/users/vyanamandra/.ssh/amy-test.pem
+35.93.12.106 ansible_connection=ssh ansible_user=ubuntu ansible_private_key_file=/users/vyanamandra/.ssh/amy-test.pem
+54.200.204.197 ansible_connection=ssh ansible_user=ubuntu ansible_private_key_file=/users/vyanamandra/.ssh/amy-test.pem
+18.236.247.198 ansible_connection=ssh ansible_user=ubuntu ansible_private_key_file=/users/vyanamandra/.ssh/amy-test.pem
+
+[vm_ec2_servers]
+54.185.160.71 ansible_connection=ssh ansible_user=ubuntu ansible_private_key_file=/users/vyanamandra/.ssh/amy-test.pem
+35.93.12.106 ansible_connection=ssh ansible_user=ubuntu ansible_private_key_file=/users/vyanamandra/.ssh/amy-test.pem
+54.200.204.197 ansible_connection=ssh ansible_user=ubuntu ansible_private_key_file=/users/vyanamandra/.ssh/amy-test.pem
+
+[vm_ec2_clients]
+18.236.247.198 ansible_connection=ssh ansible_user=ubuntu ansible_private_key_file=/users/vyanamandra/.ssh/amy-test.pem
+
+[vm_ec2_mgmt]
+54.185.160.71 ansible_connection=ssh ansible_user=ubuntu ansible_private_key_file=/users/vyanamandra/.ssh/amy-test.pem
+

@@ -1,0 +1,59 @@
+---
+# Task that will be used to Launch/Create an EC2 Instance
+
+- name: get private ip of each of the hosts
+  register: "private_ip"
+  become: true
+  when: "'venus_dc_vm_ec2_nodes' in group_names"
+  ansible.builtin.shell:
+    cmd: hostname -i
+
+- name: display the value of private_ip
+  debug:
+    var: private_ip['stdout'] | flatten
+
+
+- name: rm -f hashicorp-archive-keyring.gpg
+  become: true
+  when: "'venus_dc_vm_ec2_nodes' in group_names"
+  ansible.builtin.shell:
+    cmd: rm -f /usr/share/keyrings/hashicorp-archive-keyring.gpg
+
+- name: Wget hashicorp-archive-keyring.gpg
+  become: true
+  when: "'venus_dc_vm_ec2_nodes' in group_names"
+  ansible.builtin.shell:
+    cmd: wget -O- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+
+- name: Add hashicorp repo to sources list
+  become: true
+  when: "'venus_dc_vm_ec2_nodes' in group_names"
+  ansible.builtin.shell:
+    cmd: echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+
+- name: Update apt cache
+  become: true
+  when: "'venus_dc_vm_ec2_nodes' in group_names"
+  apt:
+    update_cache: yes
+
+- name: Install the latest consul package
+  become: true
+  when: "'venus_dc_vm_ec2_nodes' in group_names"
+  ansible.builtin.apt:
+    name: consul
+    state: present
+
+
+- name: Comment out Type from consul service definition file
+  become: true
+  when: "'venus_dc_vm_ec2_nodes' in group_names"
+  ansible.builtin.shell:
+    cmd: sed -i 's/^Type=notify/#Type=notify/g' /lib/systemd/system/consul.service
+
+
+- name: Just force systemd to reread configs (2.4 and above)
+  become: true
+  ansible.builtin.shell:
+    cmd: systemctl daemon-reload
+  when: "'venus_dc_vm_ec2_nodes' in group_names"
