@@ -1,0 +1,19 @@
+operator = "write"
+
+{% if 'ent' in CONSUL_VM_VERSION %}
+
+service_prefix "" {
+  policy = "read"
+  intentions = "read"
+}
+
+namespace_prefix "" {
+{% endif %}
+  acl = "write"
+  service_prefix "" {
+    policy = "read"
+    intentions = "read"
+  }
+{% if 'ent' in CONSUL_VM_VERSION %}
+}
+{% endif %}

@@ -1,0 +1,3 @@
+{% if CONSUL_VM_EC2_GOSSIP_ENABLED|bool %}
+encrypt = "{{ groups[DC_MGMT] | map('extract', hostvars, 'gossip_encrypt_' + DC_NORM) | list | join('') }}"
+{% endif %}

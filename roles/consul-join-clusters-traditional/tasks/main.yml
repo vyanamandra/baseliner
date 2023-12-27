@@ -1,2 +1,223 @@
 ---
 # tasks file for consul-join-clusters-traditional
+- name: Set Apache URL
+  set_fact:
+    CONSUL_VM_EC2_FEDERATED: True
+
+- name: get private ip of each of the hosts
+  register: "private_ip"
+  become: true
+  when: inventory_hostname in ((groups[PRIMARY_DC_SERVERS] + (groups[SECONDARY_DC2_SERVERS] if (CONSUL_VM_EC2_DC2_ENABLED|bool) else []) + (groups[SECONDARY_DC3_SERVERS] if (CONSUL_VM_EC2_DC3_ENABLED|bool) else [])) | unique)
+  ansible.builtin.shell:
+    cmd: hostname -I | awk '{print $1}'
+
+- name: Stop consul service on all Consul Nodes
+  become: true
+  when: ("consul_nodes" in group_names)
+  ansible.builtin.systemd_service:
+    name: consul
+    state: stopped
+
+- name: Get the CA.pem from DC1
+  become: true
+  ansible.builtin.shell: 
+    cmd: cat /opt/consul/tls/consul-agent-ca.pem
+  register: mgmt_tls_ca_pem_dc1
+  when: CONSUL_VM_EC2_TLS_ENABLED|bool and PRIMARY_DC_MGMT in group_names
+  
+- name: Get the CA.pem from DC2
+  become: true
+  ansible.builtin.shell: 
+    cmd: cat /opt/consul/tls/consul-agent-ca.pem
+  register: mgmt_tls_ca_pem_dc2
+  when: CONSUL_VM_EC2_TLS_ENABLED|bool and inventory_hostname in (groups[SECONDARY_DC2_MGMT] if CONSUL_VM_EC2_DC2_ENABLED |bool else [])
+
+- name: Get the CA.pem from DC3
+  become: true
+  ansible.builtin.shell: 
+    cmd: cat /opt/consul/tls/consul-agent-ca.pem
+  register: mgmt_tls_ca_pem_dc3
+  when: CONSUL_VM_EC2_TLS_ENABLED|bool and inventory_hostname in (groups[SECONDARY_DC3_MGMT] if CONSUL_VM_EC2_DC3_ENABLED |bool else [])
+  
+  #inventory_hostname in ((groups[PRIMARY_DC_MGMT] + groups[SECONDARY_DC2_MGMT] if CONSUL_VM_EC2_DC2_ENABLED |bool else None + groups[SECONDARY_DC3_MGMT] if CONSUL_VM_EC2_DC3_ENABLED|bool else None ) | unique)
+
+- name: Append DC1 CA.pem contents to DC2 and DC3 CA.PEM files
+  become: true
+  ansible.builtin.shell:
+   cmd: echo "{{ groups[PRIMARY_DC_MGMT] | map('extract', hostvars, 'mgmt_tls_ca_pem_dc1') | map(attribute='stdout', default='') | list | select | join('') }}" >> /opt/consul/tls/consul-agent-ca.pem
+  when: CONSUL_VM_EC2_TLS_ENABLED|bool and inventory_hostname in ((groups[SECONDARY_DC2_NODES] if CONSUL_VM_EC2_DC2_ENABLED|bool else [] + groups[SECONDARY_DC3_NODES] if CONSUL_VM_EC2_DC3_ENABLED|bool else [])|unique)
+
+- name: Append DC2 CA.pem contents to DC3 and DC1 CA.PEM files - {{ PRIMARY_DC_NODES }} - {{ (((groups[SECONDARY_DC3_NODES] if (CONSUL_VM_EC2_DC2_ENABLED|bool) else []) + groups[PRIMARY_DC_NODES])|unique) }}
+  become: true
+  ansible.builtin.shell:
+   cmd: echo "{{ groups[SECONDARY_DC2_MGMT] | map('extract', hostvars, 'mgmt_tls_ca_pem_dc2') | map(attribute='stdout', default='') | list | select | join('') }}" >> /opt/consul/tls/consul-agent-ca.pem
+  when: CONSUL_VM_EC2_TLS_ENABLED|bool and inventory_hostname in (((groups[SECONDARY_DC3_NODES] if (CONSUL_VM_EC2_DC3_ENABLED|bool) else []) + groups[PRIMARY_DC_NODES])|unique)
+
+- name: Append DC3 CA.pem contents to DC1 and DC2 CA.PEM files - {{ (((groups[SECONDARY_DC2_NODES] if (CONSUL_VM_EC2_DC2_ENABLED|bool) else []) + groups[PRIMARY_DC_NODES])|unique) }}
+  become: true
+  ansible.builtin.shell:
+   cmd: echo "{{ groups[SECONDARY_DC3_MGMT] if CONSUL_VM_EC2_DC3_ENABLED|bool else [] | map('extract', hostvars, 'mgmt_tls_ca_pem_dc3') | map(attribute='stdout', default='') | list | select | join('') }}" >> /opt/consul/tls/consul-agent-ca.pem
+  when: CONSUL_VM_EC2_TLS_ENABLED|bool and inventory_hostname in (((groups[SECONDARY_DC2_NODES] if (CONSUL_VM_EC2_DC2_ENABLED|bool) else []) + groups[PRIMARY_DC_NODES])|unique)
+
+- name: Add a new line to ca.pem
+  become: true 
+  ansible.builtin.shell:
+    cmd: echo "" >> /opt/consul/tls/consul-agent-ca.pem
+  when: CONSUL_VM_EC2_TLS_ENABLED|bool and ("consul_nodes" in group_names)
+
+
+- name: Save the replication token to a register
+  become: true
+  when: DC_MGMT in group_names and CONSUL_VM_EC2_ACL_ENABLED|bool and CONSUL_TRADITIONAL_MESH_ENABLED|bool
+  ansible.builtin.shell:
+    cmd: cat /root/acl-replication-token.hcl | grep '^SecretID' | tr -d ' ' | awk -F ':' '{print $2}'
+  register: acl_replication_token
+
+# - name: Set acl_replication_token_{{ DC_NORM }} as a fact on the management node
+#   set_fact: 
+#     acl_replication_token_{{ DC_NORM }}: "{{ acl_replication_token['stdout'] }}"
+#   when: DC_MGMT in group_names and CONSUL_VM_EC2_ACL_ENABLED|bool and CONSUL_TRADITIONAL_MESH_ENABLED|bool
+
+- name: Print the gateway for each host when defined
+  ansible.builtin.debug:
+    msg: "Value of federation is: {{ groups[PRIMARY_DC_MGMT] | map('extract', hostvars, 'acl_replication_token') | map(attribute='stdout', default='') | list | select | join('') }}"
+  when: ansible_default_ipv4.gateway is defined
+
+- name: Templated copy of ACL that now has enable_token_replication = true
+  become: true
+  template: 
+    src: "{{ playbook_dir }}/roles/consul-common-templates/templates/consul-acl.hcl.j2"
+    dest: "/etc/consul.d/consul-acl.hcl"
+  when: (CONSUL_VM_EC2_FEDERATED|bool) and ("consul_nodes" in group_names)
+
+- name: Templated copy of consul-federation.hcl.j2 that now has retry_join_wan enabled.
+  become: true
+  template: 
+    src: "{{ playbook_dir }}/roles/consul-common-templates/templates/consul-federation.hcl.j2"
+    dest: "/etc/consul.d/consul-federation.hcl"
+  when: inventory_hostname in ((groups[PRIMARY_DC_SERVERS] + (groups[SECONDARY_DC2_SERVERS] if (CONSUL_VM_EC2_DC2_ENABLED|bool) else []) + (groups[SECONDARY_DC3_SERVERS] if (CONSUL_VM_EC2_DC3_ENABLED|bool) else [])) | unique)
+
+# - name: Templated copy of gossip-encryption.hcl.j2 that now has the same encryption token as that from the Primary datacenter.
+#   become: true
+#   template: 
+#     src: "{{ playbook_dir }}/roles/consul-common-templates/templates/gossip-encryption.hcl.j2"
+#     dest: "/etc/consul.d/gossip-encryption.hcl"
+#   when: (CONSUL_VM_EC2_GOSSIP_ENABLED|bool) and inventory_hostname in ((groups[PRIMARY_DC_SERVERS] + (groups[SECONDARY_DC2_SERVERS] if (CONSUL_VM_EC2_DC2_ENABLED|bool) else []) + (groups[SECONDARY_DC3_SERVERS] if (CONSUL_VM_EC2_DC3_ENABLED|bool) else [])) | unique)
+
+
+- name: Get the Gossip encryption key from the Primary DC Mgmt server
+  become: true
+  ansible.builtin.shell:
+    cmd: grep '^encrypt' /etc/consul.d/gossip-encryption.hcl | cut -f 2 -d '"'
+  when: CONSUL_VM_EC2_GOSSIP_ENABLED|bool and PRIMARY_DC_MGMT in group_names
+  register: "primary_gossip_encryption_token"
+
+- name: Set primary_encrypt_key
+  set_fact: 
+    primary_encrypt_key: "{{ primary_gossip_encryption_token['stdout'] }}"
+  when: CONSUL_VM_EC2_GOSSIP_ENABLED|bool and PRIMARY_DC_MGMT in group_names
+
+- name: Set encrypt token ("encrypt = \"{{ groups[PRIMARY_DC_MGMT] | map('extract', hostvars, 'primary_encrypt_key') | list | join('') }}\"") the same on all DCs.
+  become: true
+  ansible.builtin.replace:
+    path: /etc/consul.d/gossip-encryption.hcl
+    regexp: '^encrypt.*'
+    replace: "encrypt = \"{{ groups[PRIMARY_DC_MGMT] | map('extract', hostvars, 'primary_encrypt_key') | list | join('') }}\""
+  when: CONSUL_VM_EC2_GOSSIP_ENABLED|bool and ("consul_nodes" in group_names)
+
+- name: Remove serf/remote.keyring files from all DCs.
+  become: true
+  ansible.builtin.file:
+    path: /opt/consul/data-dir/serf/remote.keyring
+    state: absent 
+  when: CONSUL_VM_EC2_GOSSIP_ENABLED|bool and "consul_nodes" in group_names
+
+- name: Remove serf/local.keyring files from all DCs.
+  become: true
+  ansible.builtin.file:
+    path: /opt/consul/data-dir/serf/local.keyring
+    state: absent 
+  when: CONSUL_VM_EC2_GOSSIP_ENABLED|bool and "consul_nodes" in group_names
+
+# - name: Ensure primary_datacenter is set to the name of DC1 on all DCs.
+#   become: true
+#   ansible.builtin.shell:
+#     cmd: echo 'primary_datacenter="{{ PRIMARY_DC_NAME }}"' >> /etc/consul.d/consul.hcl 
+#   when: ("consul_nodes" in group_names)
+
+- name: Replace single quotes with double quotes
+  become: true
+  when: ("consul_nodes" in group_names)
+  ansible.builtin.shell:
+    cmd: for f in $(ls /etc/consul.d/*.hcl); do sed -i "s/'/\"/g" "${f}"; done
+
+- name: Set group and owner to Consul over /etc/consul.d 
+  become: true
+  file: dest=/etc/consul.d owner=consul group=consul recurse=yes
+
+- name: Set group and owner to Consul over /opt/consul
+  become: true
+  file: dest=/opt/consul owner=consul group=consul recurse=yes
+
+- name: Start consul service on all Consul Nodes
+  become: true
+  when: ("consul_nodes" in group_names)
+  ansible.builtin.systemd_service:
+    name: consul
+    state: started
+
+# Needs a better logic here
+- name: Get the Bootstrap token from the primary DC 
+  become: true
+  when: PRIMARY_DC_MGMT in group_names and CONSUL_VM_EC2_ACL_ENABLED|bool
+  ansible.builtin.shell:
+    cmd: . ~/.bashrc 2>/dev/null && consul acl token list | grep 'Bootstrap Token' -B1 | grep SecretID | awk '{print $2}'
+  register: primary_bootstrap_token
+
+# # Needs a better logic here
+# - name: Get the replication token from the primary DC 
+#   become: true
+#   when: PRIMARY_DC_MGMT in group_names and CONSUL_VM_EC2_ACL_ENABLED|bool
+#   ansible.builtin.shell:
+#     cmd: . ~/.bashrc 2>/dev/null && consul acl token list | grep 'ACL Replication Token' -B1 | grep SecretID | awk '{print $2}'
+#   register: acl_replication_token
+
+- name: Set the bootstrap token within .bashrc of all Consul Nodes
+  become: true
+  when: ("consul_nodes" in group_names) and CONSUL_VM_EC2_ACL_ENABLED|bool
+  ansible.builtin.shell:
+    cmd: sed -i 's/^export CONSUL_HTTP_TOKEN=.*/export CONSUL_HTTP_TOKEN={{ groups[PRIMARY_DC_MGMT] | map("extract", hostvars, "primary_bootstrap_token") | map(attribute="stdout", default="") | list | select | join("") }}/g' ~/.bashrc
+
+# - name: Set ACL replication token on all servers
+#   when: (CONSUL_VM_EC2_ACL_ENABLED|bool and (inventory_hostname in (((groups[SECONDARY_DC2_SERVERS] if CONSUL_VM_EC2_DC2_ENABLED|bool else [])+ (groups[SECONDARY_DC3_SERVERS] if CONSUL_VM_EC2_DC3_ENABLED|bool else []) |unique))))
+#   become: true
+#   ansible.builtin.shell:
+#     cmd: . ~/.bashrc 2>/dev/null && sleep 30 && consul acl set-agent-token replication {{ groups[PRIMARY_DC_MGMT] | map("extract", hostvars, "acl_replication_token") | map(attribute="stdout", default="") | list | select | join("") }}
+
+- name: Create agent tokens for all nodes and save it to a local file.
+  when: (CONSUL_VM_EC2_ACL_ENABLED|bool and "consul_nodes" in group_names)
+  become: true
+  ansible.builtin.shell:
+    cmd: . ~/.bashrc 2>/dev/null && sleep 60 && consul acl token create -node-identity=$(grep node_name /etc/consul.d/consul.hcl | cut -f 2 -d '=' | tr -d ' "'):$(grep '^datacenter' /etc/consul.d/consul-common.hcl | cut -f2 -d '"') | grep ^SecretID | tr -d ' ' | awk -F ':' '{print $2}' > /root/agent-token-after-federation.txt
+
+- name: Set the newly created agent token read from /root/agent-token-after-federation.txt
+  when: (CONSUL_VM_EC2_ACL_ENABLED|bool and "consul_nodes" in group_names)
+  become: true
+  ansible.builtin.shell:
+    cmd: . ~/.bashrc 2>/dev/null && sleep 60 && consul acl set-agent-token agent $(cat /root/agent-token-after-federation.txt) && rm -f /root/agent-token-after-federation.txt
+
+# - name: Set the bootstrap token within .bashrc of all Consul Nodes
+#   become: true
+#   when: ("consul_nodes" in group_names) and CONSUL_VM_EC2_ACL_ENABLED|bool
+#   ansible.builtin.shell:
+#     cmd: sed -i 's/^export CONSUL_HTTP_TOKEN=.*/export CONSUL_HTTP_TOKEN={{ groups[PRIMARY_DC_MGMT] | map("extract", hostvars, "primary_bootstrap_token") | map(attribute="stdout", default="") | list | select | join("") }}/g' ~/.bashrc
+
+# - name: Create agent tokens for all nodes of DC3 afresh and set them.
+#   when: (CONSUL_VM_EC2_ACL_ENABLED|bool and CONSUL_VM_EC2_DC3_ENABLED|bool and SECONDARY_DC3_NODES in group_names)
+#   become: true
+#   ansible.builtin.shell:
+#     cmd: . ~/.bashrc 2>/dev/null && sleep 30 && consul acl set-agent-token agent $(consul acl token create -node-identity=$(grep node_name /etc/consul.d/consul.hcl | cut -f 2 -d '=' | tr -d ' "'):{{ SECONDARY_DC3_NAME }} | grep ^SecretID | tr -d ' ' | awk -F ':' '{print $2}')
+
+
+
+

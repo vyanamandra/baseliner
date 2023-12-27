@@ -17,7 +17,7 @@ variable "ami" {
 }
 
 variable "instance_count" {
-  default = {{ (CONSUL_VM_EC2_SERVER_COUNT|int) + (CONSUL_VM_EC2_CLIENT_COUNT|int) }}
+  default = {{ (CONSUL_VM_EC2_SERVER_COUNT | int) + (CONSUL_VM_EC2_CLIENT_COUNT | int) }}
 }
 
 variable "key_name" {
@@ -45,7 +45,7 @@ resource "aws_instance" "consul-servers" {
   security_groups = var.security_groups
 
   tags = {
-    Name  = "{{ CONSUL_VM_EC2_NAME_TAG_PREFIX }}-{{ DC_NORM }}-${count.index + 1}"
+    Name  = "{{ CONSUL_VM_EC2_NAME_TAG_PREFIX }}-{{ DC_NORM }}-n${count.index + 1}"
     Owner = "{{ CONSUL_VM_EC2_OWNER_TAG }}"
   }
 }
