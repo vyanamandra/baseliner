@@ -1,0 +1,18 @@
+- name: Reset Consul configuration on all nodes
+  hosts: all
+
+  tasks:
+  - name: stop consul 
+    become: true
+    shell:
+      cmd: systemctl stop consul
+
+  - name: Empty out the contents of /opt/consul directory
+    become: true
+    shell:
+      cmd: rm -rf /opt/consul/*
+
+  - name: Remove all hcl files from /etc/consul.d directory
+    become: true
+    shell:
+      cmd: rm -rf /etc/consul.d/*.hcl
