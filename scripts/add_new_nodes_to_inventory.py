@@ -32,7 +32,7 @@ def main(args):
 
 	config[f'{args.datacenter}_nodes'] = {}
 	nid = 0
-	for pubip in tf_nodes['ec2_machines']['value']:
+	for pubip in tf_nodes['provisioned_nodes']['value']:
 		config[f'{args.datacenter}_nodes'][INVENTORY_TEMPLATE.format(datacenter=args.datacenter, nodename=f'node{nid}', node_ip = pubip, user = 'ubuntu', ssh_private_key = args.sshkey)] = None
 		nid += 1
 
@@ -64,7 +64,7 @@ def main(args):
 
 
 if __name__ == '__main__':
-	parser = argparse.ArgumentParser(prog='add_ec2_to_config.py',
+	parser = argparse.ArgumentParser(prog='add_new_nodes_to_inventory.py',
 					description = 'Add newly created servers to the right config blocks of our inventory')
 					
 	parser.add_argument('-i', '--inventory', help = 'inventory file')
