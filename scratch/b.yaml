@@ -1,0 +1,11 @@
+- name: Check private_ip of each host
+  hosts: all
+
+  tasks:
+  - name: Wait for SSH to come up on the newly created nodes
+    local_action: wait_for
+                  host="54.185.160.71"
+                  port=22
+                  state=started
+    with_items: "{{ groups['venus_dc_vm_ec2_nodes'] }}"
+

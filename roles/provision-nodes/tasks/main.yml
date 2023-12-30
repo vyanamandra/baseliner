@@ -1,0 +1,27 @@
+---
+# tasks file for provisioning nodes
+
+- name: Create the output/utils/vm-{{ DC_NORM }} directory
+  ansible.builtin.file:
+    path: 'output/utils/vm-{{ DC_NORM }}'
+    state: directory
+
+- name: Fill and place utils/vm-{{ DC_NORM }}/create_machines.tf in output/utils/vm-{{ DC_NORM }}
+  ansible.builtin.template:
+    src: 'create_machines-{{ CLOUD_TYPE }}.tf'
+    dest: 'output/utils/vm-{{ DC_NORM }}'
+    mode: '0644'
+  when: CONSUL_VM_PROVISION | bool
+
+- name: Run Terraform to provision the new nodes.
+  terraform:
+    project_path: 'output/utils/vm-{{ DC_NORM }}'
+    force_init: true
+    state: present
+
+- name: Execute Python Script using the shell module
+  ansible.builtin.shell:
+    cmd: python scripts/add_new_nodes_to_inventory.py -d {{ DC_NORM }} -i {{ playbook_dir }}/inventory/hosts -l output/utils/vm-{{ DC_NORM }} -s {{ CONSUL_VM_SERVER_COUNT }} -c {{ CONSUL_VM_CLIENT_COUNT }} -t {{ DC_ROLE }} -k {{ CONSUL_VM_SSH_PRIV_KEY_FILE }}
+  when: CONSUL_VM_PROVISION | bool
+
+- meta: refresh_inventory

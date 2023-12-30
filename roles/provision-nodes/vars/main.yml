@@ -1,0 +1,26 @@
+---
+# vars file for vm-ec2
+# Default values. Could always be overridden from env-selection
+#CONSUL_VM_AMI_IMAGE: ""
+#CONSUL_VM_KEY_NAME: ""
+#CONSUL_VM_INSTANCE_TYPE: "t3.medium"
+#CONSUL_VM_AWS_REGION: "us-west-2"
+#CONSUL_VM_SECURITY_GROUP: ""
+#CONSUL_VM_NAME_TAG_PREFIX: ""
+
+CONSUL_DC1_DC_PH: "DC1"
+CONSUL_DC2_DC_PH: "DC2"
+CONSUL_DC3_DC_PH: "DC3"
+
+CONSUL_VM_DC1_PROVISION: "False"
+CONSUL_VM_DC2_PROVISION: "False"
+CONSUL_VM_DC3_PROVISION: "False"
+
+DC_NORM: "{{ vars['CONSUL_VM_' + DC + '_DATACENTER'] | replace('-', '_') }}"
+CLOUD_TYPE: "{{ vars['CONSUL_VM_' + DC + '_CLOUD_TYPE'] }}"
+CONSUL_VM_PROVISION: "{{ vars['CONSUL_VM_' + DC + '_PROVISION'] | bool }}"
+CONSUL_VM_DATACENTER: "{{ vars['CONSUL_VM_' + DC + '_DATACENTER'] }}"
+CONSUL_VM_ENABLED: "{{ vars['CONSUL_VM_' + DC + '_ENABLED'] | bool }}"
+CONSUL_VM_SERVER_COUNT: "{{ vars['CONSUL_VM_' + DC + '_SERVER_COUNT'] | int }}"
+CONSUL_VM_CLIENT_COUNT: "{{ vars['CONSUL_VM_' + DC + '_CLIENT_COUNT'] | int }}"
+
