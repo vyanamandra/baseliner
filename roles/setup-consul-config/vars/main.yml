@@ -2,17 +2,17 @@
 # vars file for setup-consul-config
 # Default values. Could always be overridden from env-selection
 
-DC_NAME: "{{ vars['CONSUL_VM_EC2_' + DC + '_DATACENTER'] }}"
+DC_NAME: "{{ vars['CONSUL_VM_' + DC + '_DATACENTER'] }}"
 DC_NORM: "{{ DC_NAME | replace('-', '_') }}"
 DC_SERVERS: "{{ DC_NORM }}_servers"
 DC_CLIENTS: "{{ DC_NORM }}_clients"
 DC_NODES: "{{ DC_NORM }}_nodes"
 DC_MGMT: "{{ DC_NORM }}_mgmt"
 
-CONSUL_VM_EC2_PROVISION: "{{ vars['CONSUL_VM_EC2_' + DC + '_PROVISION'] | bool }}"
-CONSUL_VM_EC2_DATACENTER: "{{ vars['CONSUL_VM_EC2_' + DC + '_DATACENTER'] }}"
-CONSUL_VM_EC2_ENABLED: "{{ vars['CONSUL_VM_EC2_' + DC + '_ENABLED'] | bool }}"
-CONSUL_VM_EC2_SERVER_COUNT: "{{ vars['CONSUL_VM_EC2_' + DC + '_SERVER_COUNT'] | int }}"
-CONSUL_VM_EC2_CLIENT_COUNT: "{{ vars['CONSUL_VM_EC2_' + DC + '_CLIENT_COUNT'] | int }}"
+CONSUL_VM_PROVISION: "{{ vars['CONSUL_VM_' + DC + '_PROVISION'] | bool }}"
+CONSUL_VM_DATACENTER: "{{ vars['CONSUL_VM_' + DC + '_DATACENTER'] }}"
+CONSUL_VM_ENABLED: "{{ vars['CONSUL_VM_' + DC + '_ENABLED'] | bool }}"
+CONSUL_VM_SERVER_COUNT: "{{ vars['CONSUL_VM_' + DC + '_SERVER_COUNT'] | int }}"
+CONSUL_VM_CLIENT_COUNT: "{{ vars['CONSUL_VM_' + DC + '_CLIENT_COUNT'] | int }}"
 
-CONSUL_HTTP_ADDR_LOC: "{{ 'https://127.0.0.1:8501' if CONSUL_VM_EC2_TLS_ENABLED|bool else 'http://127.0.0.1:8500' }}"
+CONSUL_HTTP_ADDR_LOC: "{{ 'https://127.0.0.1:8501' if CONSUL_VM_TLS_ENABLED|bool else 'http://127.0.0.1:8500' }}"

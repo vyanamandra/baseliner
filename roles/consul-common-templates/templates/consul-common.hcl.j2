@@ -1,4 +1,4 @@
-datacenter = "{{ CONSUL_VM_EC2_DATACENTER }}"
+datacenter = "{{ CONSUL_VM_DATACENTER }}"
 
 data_dir = "/opt/consul/data-dir"
 
@@ -9,10 +9,6 @@ advertise_addr = {% raw %} "{{ GetPrivateIP }}" {% endraw %}
 retry_join = {{ groups[DC_NODES] | map('extract', hostvars, 'private_ip') | map(attribute='stdout', default='') | list | select }}
 
 ui_config {
-  enabled = true
-}
-
-connect {
   enabled = true
 }
 

@@ -1,1 +1,44 @@
+[venus_dc_nodes]
+venus_dc_node0 ansible_host=35.92.234.145 ansible_connection=ssh ansible_user=ubuntu ansible_private_key_file=/users/vyanamandra/.ssh/amy-test.pem
+venus_dc_node1 ansible_host=35.93.66.10 ansible_connection=ssh ansible_user=ubuntu ansible_private_key_file=/users/vyanamandra/.ssh/amy-test.pem
+venus_dc_node2 ansible_host=54.244.144.165 ansible_connection=ssh ansible_user=ubuntu ansible_private_key_file=/users/vyanamandra/.ssh/amy-test.pem
+venus_dc_node3 ansible_host=34.219.187.241 ansible_connection=ssh ansible_user=ubuntu ansible_private_key_file=/users/vyanamandra/.ssh/amy-test.pem
+
+[venus_dc_servers]
+venus_dc_node0
+venus_dc_node1
+venus_dc_node2
+
+[venus_dc_clients]
+venus_dc_node3
+
+[venus_dc_mgw]
+venus_dc_node3
+
+[consul_nodes]
+venus_dc_node0
+venus_dc_node1
+venus_dc_node2
+venus_dc_node3
+sierra_dc_node0
+sierra_dc_node1
+
+[venus_dc_mgmt]
+venus_dc_node0
+
+[sierra_dc_nodes]
+sierra_dc_node0 ansible_host=35.92.117.238 ansible_connection=ssh ansible_user=ubuntu ansible_private_key_file=/users/vyanamandra/.ssh/amy-test.pem
+sierra_dc_node1 ansible_host=52.12.11.71 ansible_connection=ssh ansible_user=ubuntu ansible_private_key_file=/users/vyanamandra/.ssh/amy-test.pem
+
+[sierra_dc_servers]
+sierra_dc_node0
+
+[sierra_dc_clients]
+sierra_dc_node1
+
+[sierra_dc_mgw]
+sierra_dc_node1
+
+[sierra_dc_mgmt]
+sierra_dc_node0
 

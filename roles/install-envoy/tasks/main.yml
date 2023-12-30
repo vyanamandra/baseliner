@@ -1,4 +1,5 @@
-# Task that will be used to Launch/Create an EC2 Instance
+---
+# Task that will be used to install Envoy on the newly provisioned nodes
 
 - name: Install func-e
   become: true

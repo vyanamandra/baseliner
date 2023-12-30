@@ -1,8 +1,8 @@
 server = true
 node_name = "{{ inventory_hostname }}_srv"
 
-{% if CONSUL_VM_EC2_SERVER_COUNT == 1 %}
+{% if CONSUL_VM_SERVER_COUNT == 1 %}
 bootstrap = true
 {% else %}
-bootstrap_expect = {{ CONSUL_VM_EC2_SERVER_COUNT }}
+bootstrap_expect = {{ CONSUL_VM_SERVER_COUNT }}
 {% endif %}

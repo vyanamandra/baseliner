@@ -2,7 +2,7 @@
   hosts: all
 
   tasks:
-  - name: Wait for SSH to come up on the newly created EC2 nodes
+  - name: Wait for SSH to come up on the newly created nodes
     local_action: wait_for
                   host="54.185.160.71"
                   port=22

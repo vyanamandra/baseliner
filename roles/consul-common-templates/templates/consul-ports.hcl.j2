@@ -1,7 +1,7 @@
 ports {
-  http = {{ -1 if CONSUL_VM_EC2_TLS_ENABLED|bool else 8500 }}
-  https = {{ 8501 if CONSUL_VM_EC2_TLS_ENABLED|bool else -1 }} 
-  grpc = {{ -1 if CONSUL_VM_EC2_TLS_ENABLED|bool else 8502 }}
-  grpc_tls = {{ 8503 if CONSUL_VM_EC2_TLS_ENABLED|bool else -1 }} 
+  http = {{ -1 if CONSUL_VM_TLS_ENABLED|bool else 8500 }}
+  https = {{ 8501 if CONSUL_VM_TLS_ENABLED|bool else -1 }} 
+  grpc = {{ -1 if CONSUL_VM_TLS_ENABLED|bool else 8502 }}
+  grpc_tls = {{ 8503 if CONSUL_VM_TLS_ENABLED|bool else -1 }} 
   dns = 8600
 }

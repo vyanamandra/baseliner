@@ -12,28 +12,28 @@ terraform {
 
 variable "ami" {
   default = {
-    "{{ CONSUL_VM_EC2_AWS_REGION }}" = "{{ CONSUL_VM_EC2_AMI_IMAGE }}"
+    "{{ CONSUL_VM_AWS_REGION }}" = "{{ CONSUL_VM_AMI_IMAGE }}"
   }
 }
 
 variable "instance_count" {
-  default = {{ (CONSUL_VM_EC2_SERVER_COUNT | int) + (CONSUL_VM_EC2_CLIENT_COUNT | int) }}
+  default = {{ (CONSUL_VM_SERVER_COUNT | int) + (CONSUL_VM_CLIENT_COUNT | int) }}
 }
 
 variable "key_name" {
-  default = "{{ CONSUL_VM_EC2_KEY_NAME }}"
+  default = "{{ CONSUL_VM_KEY_NAME }}"
 }
 
 variable "instance_type" {
-  default = "{{ CONSUL_VM_EC2_INSTANCE_TYPE }}"
+  default = "{{ CONSUL_VM_INSTANCE_TYPE }}"
 }
 
 variable "aws_region" {
-  default = "{{ CONSUL_VM_EC2_AWS_REGION }}"
+  default = "{{ CONSUL_VM_AWS_REGION }}"
 }
 
 variable "security_groups" {
-  default = ["{{ CONSUL_VM_EC2_SECURITY_GROUP }}"]
+  default = ["{{ CONSUL_VM_SECURITY_GROUP }}"]
 }
 
 
@@ -45,12 +45,12 @@ resource "aws_instance" "consul-servers" {
   security_groups = var.security_groups
 
   tags = {
-    Name  = "{{ CONSUL_VM_EC2_NAME_TAG_PREFIX }}-{{ DC_NORM }}-n${count.index + 1}"
-    Owner = "{{ CONSUL_VM_EC2_OWNER_TAG }}"
+    Name  = "{{ CONSUL_VM_NAME_TAG_PREFIX }}-{{ DC_NORM }}-n${count.index + 1}"
+    Owner = "{{ CONSUL_VM_OWNER_TAG }}"
   }
 }
 
-output "ec2_machines" {
+output "provisioned_nodes" {
   description = "List of public IP addresses assigned to the instances"
   value = "${aws_instance.consul-servers.*.public_ip}"
 }

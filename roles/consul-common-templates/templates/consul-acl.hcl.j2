@@ -1,6 +1,6 @@
 acl {
 
-{% if CONSUL_VM_EC2_ACL_ENABLED|bool %}
+{% if CONSUL_VM_ACL_ENABLED|bool %}
   enabled = true
 {% else %}
   enabled = false
@@ -9,7 +9,7 @@ acl {
   down_policy = "extend-cache"
   enable_token_persistence = true
 
-{% if CONSUL_VM_EC2_FEDERATED|bool %}
+{% if CONSUL_VM_FEDERATED|bool %}
   enable_token_replication = true
   tokens = {
     replication = "{{ groups[PRIMARY_DC_MGMT] | map('extract', hostvars, 'acl_replication_token') | map(attribute='stdout', default='') | list | select | join('') }}"
