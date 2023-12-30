@@ -1,0 +1,7 @@
+{% if CONSUL_VM_EC2_MESH_FEDERATED %}
+primary_gateways = ["{{ (groups[PRIMARY_DC_MGW] | map('extract', hostvars, 'ansible_host') | list | select | join ('')) + ':8443' }}"]
+{% endif %}
+connect {
+  enabled = true
+  {% if CONSUL_VM_EC2_MESH_FEDERATED %} enable_mesh_gateway_wan_federation = true {% endif %}
+}

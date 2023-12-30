@@ -1,0 +1,18 @@
+# /lib/systemd/system/mesh-gateway.service
+[Unit]
+Description=Consul Service Mesh Gateway 
+After=network.target consul.service
+Requires=consul.service
+AssertPathExists=/opt/consul/systemctl-service-configs
+AssertPathIsDirectory=/opt/consul/systemctl-service-configs
+AssertFileNotEmpty=/opt/consul/systemctl-service-configs/mesh-gateway.env
+
+[Service]
+Type=simple
+ExecStart=consul connect envoy -gateway=mesh -register -expose-servers -service "${GATEWAY_SERVICE_NAME}" -address "${GATEWAY_SERVICE_PRIV_IP_PORT}" -wan-address "${GATEWAY_SERVICE_PUB_IP_PORT}" -token="${GATEWAY_SERVICE_TOKEN_ID}"
+EnvironmentFile=/opt/consul/systemctl-service-configs/mesh-gateway.env
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
