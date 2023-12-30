@@ -1,4 +1,4 @@
-{% if CONSUL_VM_EC2_TLS_ENABLED|bool %}
+{% if CONSUL_VM_TLS_ENABLED|bool %}
 tls {
   defaults {
     ca_file = "/opt/consul/tls/consul-agent-ca.pem"
@@ -10,6 +10,9 @@ tls {
   }
 
   https {
+    verify_incoming = false
+  }
+  grpc {
     verify_incoming = false
   }
 }

@@ -1,5 +1,9 @@
-{% if CONSUL_TRADITIONAL_MESH_ENABLED|bool and CONSUL_VM_EC2_FEDERATED|bool %}
-primary_datacenter = "{{ CONSUL_VM_EC2_DC1_DATACENTER }}"
+{% if CONSUL_VM_FEDERATED|bool %}
+primary_datacenter = "{{ CONSUL_VM_DC1_DATACENTER }}"
 
+{% if CONSUL_TRADITIONAL_MESH_ENABLED|bool %}
 retry_join_wan = {{ (groups["consul_nodes"] | map('extract', hostvars, 'private_ip') | map(attribute='stdout', default='') | list | select) }}
 {% endif %}
+
+{% endif %}
+

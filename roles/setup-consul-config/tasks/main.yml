@@ -8,18 +8,19 @@
   ansible.builtin.shell:
     cmd: hostname -I | awk '{print $1}'
 
-#- name: Print value of private_ip
-#  debug:
-#    var: private_ip
-#  when: DC_NODES in group_names
-
 - name: Create /opt/consul/tls on all Consul nodes
   become: true
   ansible.builtin.file:
     path: '/opt/consul/tls'
     state: directory
-  when: (CONSUL_VM_EC2_TLS_ENABLED|bool and DC_NODES in group_names)
+  when: (CONSUL_VM_TLS_ENABLED|bool and DC_NODES in group_names)
 
+- name: Create /opt/consul/systemctl-service-configs on all Consul nodes
+  become: true
+  ansible.builtin.file:
+    path: '/opt/consul/systemctl-service-configs'
+    state: directory
+  when: DC_NODES in group_names
 
 - name: Create /opt/consul/data-dir on all Consul nodes
   become: true
@@ -30,28 +31,28 @@
 
 - name: Generate TLS Certifying Authority
   become: true
-  when: (CONSUL_VM_EC2_TLS_ENABLED|bool and DC_MGMT in group_names)
+  when: (CONSUL_VM_TLS_ENABLED|bool and DC_MGMT in group_names)
   ansible.builtin.shell:
     chdir: /opt/consul/tls/
     cmd: consul tls ca create 
 
 - name: Generate TLS certificates for Servers
   become: true
-  when: (CONSUL_VM_EC2_TLS_ENABLED|bool and DC_MGMT in group_names)
+  when: (CONSUL_VM_TLS_ENABLED|bool and DC_MGMT in group_names)
   ansible.builtin.shell:
     chdir: /opt/consul/tls/
     cmd: consul tls cert create -server -node '*' -dc {{ DC_NAME }}
 
 - name: Generate TLS certificate for Clients
   become: true
-  when: (CONSUL_VM_EC2_TLS_ENABLED|bool and DC_MGMT in group_names)
+  when: (CONSUL_VM_TLS_ENABLED|bool and DC_MGMT in group_names)
   ansible.builtin.shell:
     chdir: /opt/consul/tls/
     cmd: consul tls cert create -client -dc {{ DC_NAME }}
 
 - name: Compress /opt/consul/tls/ directory
   become: true
-  when: (CONSUL_VM_EC2_TLS_ENABLED|bool and DC_MGMT in group_names)
+  when: (CONSUL_VM_TLS_ENABLED|bool and DC_MGMT in group_names)
   community.general.archive:
     path: '/opt/consul/tls/*'
     dest: '/opt/consul/tls/tls.tgz'
@@ -59,9 +60,9 @@
 - name: Make local directory that we can then use to transfer to other remote servers
   ansible.builtin.file:
     recurse: true
-    path: 'output/tls/vm-ec2-{{ DC_NAME }}'
+    path: 'output/tls/vm-{{ DC_NAME }}'
     state: directory
-  when: (CONSUL_VM_EC2_TLS_ENABLED|bool and DC_MGMT in group_names)
+  when: (CONSUL_VM_TLS_ENABLED|bool and DC_MGMT in group_names)
   delegate_to: localhost
 
 - name: Fetch the zipped tls file from the remote host to local
@@ -69,16 +70,16 @@
   ansible.builtin.fetch:
     flat: yes
     src: "/opt/consul/tls/tls.tgz"
-    dest: "{{ playbook_dir }}/output/tls/vm-ec2-{{ DC_NAME }}/"
-  when: (CONSUL_VM_EC2_TLS_ENABLED|bool and DC_MGMT in group_names)
+    dest: "{{ playbook_dir }}/output/tls/vm-{{ DC_NAME }}/"
+  when: (CONSUL_VM_TLS_ENABLED|bool and DC_MGMT in group_names)
 
 - name: Extract the files in the remote /opt/consul/tls directory
   become: true
   ansible.builtin.unarchive:
     copy: true
-    src: "{{ playbook_dir }}/output/tls/vm-ec2-{{ DC_NAME }}/tls.tgz"
+    src: "{{ playbook_dir }}/output/tls/vm-{{ DC_NAME }}/tls.tgz"
     dest: "/opt/consul/tls/"
-  when: (CONSUL_VM_EC2_TLS_ENABLED|bool and DC_NODES in group_names)
+  when: (CONSUL_VM_TLS_ENABLED|bool and DC_NODES in group_names)
 
 - name: Set group and owner to Consul over /etc/consul.d 
   become: true
@@ -96,27 +97,15 @@
 
 - name: Arrive at an encrypt string to be used on all nodes of the cluster for gossip encryption
   become: true
-  when: (CONSUL_VM_EC2_GOSSIP_ENABLED|bool and DC_MGMT in group_names)
+  when: (CONSUL_VM_GOSSIP_ENABLED|bool and DC_MGMT in group_names)
   ansible.builtin.shell:
     cmd: consul keygen
   register: "gossip_encryption_token"
 
-#- name: Display all variables/facts known for a host
-#  debug:
-#    var: hostvars
-#  tags: debug_info
-#  when: DC_NODES in group_names
-
-
 - name: Set gossip_encrypt_{{ DC_NORM }}
   set_fact: 
     gossip_encrypt_{{ DC_NORM }}: "{{ gossip_encryption_token['stdout'] }}"
-  when: (CONSUL_VM_EC2_GOSSIP_ENABLED|bool and DC_MGMT in group_names)
-
-#- name: Display all variables/facts known for a host
-#  debug:
-#    var: gossip_encrypt_{{ DC_NORM }}
-#  when: DC_NODES in group_names
+  when: (CONSUL_VM_GOSSIP_ENABLED|bool and DC_MGMT in group_names)
 
 - name: Transfer hcl files to /etc/consul.d/
   template:
@@ -163,7 +152,7 @@
 
 - name: Bootstrap consul
   become: true
-  when: (CONSUL_VM_EC2_ACL_ENABLED|bool and DC_MGMT in group_names)
+  when: (CONSUL_VM_ACL_ENABLED|bool and DC_MGMT in group_names)
   register: "bootstrap_token"
   ansible.builtin.shell:
     cmd: consul acl bootstrap  | grep ^SecretID | tr -d ' ' | awk -F ':' '{print $2}'
@@ -176,10 +165,10 @@
 - name: Set bootstrap_token_{{ DC_NORM }}
   set_fact:
     bootstrap_token_{{ DC_NORM }}: "{{ bootstrap_token['stdout'] }}"
-  when: (CONSUL_VM_EC2_ACL_ENABLED|bool and DC_MGMT in group_names)
+  when: (CONSUL_VM_ACL_ENABLED|bool and DC_MGMT in group_names)
 
 - name: Copy the bootstrap token to ~/.bashrc of the root user
-  when: (CONSUL_VM_EC2_ACL_ENABLED|bool and DC_NODES in group_names)
+  when: (CONSUL_VM_ACL_ENABLED|bool and DC_NODES in group_names)
   become: true
   ansible.builtin.shell:
     cmd: echo "export CONSUL_HTTP_TOKEN={{ groups[DC_MGMT] | map('extract', hostvars, 'bootstrap_token_' + DC_NORM) | list | join('') }}" >> ~/.bashrc
@@ -191,25 +180,21 @@
     cmd: echo 'export CONSUL_HTTP_SSL_VERIFY=false\nexport CONSUL_HTTP_ADDR="{{ CONSUL_HTTP_ADDR_LOC }}"\n' >> ~/.bashrc
 
 - name: Generate agent tokens for each of the consul nodes and set them
-  when: (CONSUL_VM_EC2_ACL_ENABLED|bool and DC_NODES in group_names)
+  when: (CONSUL_VM_ACL_ENABLED|bool and DC_NODES in group_names)
   become: true
   ansible.builtin.shell:
     cmd: . ~/.bashrc 2>/dev/null && consul acl set-agent-token agent $(consul acl token create -node-identity=$(grep node_name /etc/consul.d/consul.hcl | cut -f 2 -d '=' | tr -d ' "'):{{ DC_NAME }} | grep ^SecretID | tr -d ' ' | awk -F ':' '{print $2}')
-  #environment:
-    #CONSUL_HTTP_TOKEN: "{{ groups[DC_MGMT] | map('extract', hostvars, 'bootstrap_token_' + DC_NORM) | list | join('') }}"
-    #CONSUL_HTTP_SSL_VERIFY: "false"
-    #CONSUL_HTTP_ADDR: "{{ CONSUL_HTTP_ADDR_LOC }}"
 
 - name: Fill the template for a replication token and place the file in the primary dc mgmt node for the next step.
   become: true
-  when: DC_MGMT in group_names and CONSUL_VM_EC2_ACL_ENABLED|bool and CONSUL_TRADITIONAL_MESH_ENABLED|bool
+  when: DC_MGMT in group_names and CONSUL_VM_ACL_ENABLED|bool and (CONSUL_TRADITIONAL_MESH_ENABLED|bool or CONSUL_MESH_GATEWAY_ENABLED|bool)
   template: 
     src: "{{ playbook_dir }}/roles/consul-common-templates/templates/acl-tokens/acl-replication-policy.hcl.j2"
     dest: "/root/acl-replication-policy.hcl"
 
 - name: Create the replication policy using the file /root/acl-replication-policy.hcl already present in - {{ groups[DC_MGMT] }}
   become: true
-  when: DC_MGMT in group_names and CONSUL_VM_EC2_ACL_ENABLED|bool and CONSUL_TRADITIONAL_MESH_ENABLED|bool
+  when: DC_MGMT in group_names and CONSUL_VM_ACL_ENABLED|bool and (CONSUL_TRADITIONAL_MESH_ENABLED|bool or CONSUL_MESH_GATEWAY_ENABLED|bool)
   ansible.builtin.shell:
     cmd: >
       . ~/.bashrc 2>/dev/null \
@@ -218,7 +203,27 @@
           -name "acl-replication-policy" -rules @/root/acl-replication-policy.hcl -description "ACL replication policy" \
       && consul acl token create \
           {% if 'ent' in CONSUL_VM_VERSION %} -partition "default" -namespace "default" {% endif %}  \
-          -description "ACL Replication Token" -policy-name "acl-replication-policy" > /root/acl-replication-token.hcl
+          -description "ACL Replication Token" -policy-name "acl-replication-policy" > /root/acl-replication-token.txt
+
+- name: Send mesh-gateway-policy.hcl.j2 to /root/mesh-gateway-policy.hcl on the PRIMARY_DC_MGMT node
+  become: true
+  template: 
+    src: "{{ playbook_dir }}/roles/consul-common-templates/templates/mesh-services/mesh-gateway-policy.hcl.j2"
+    dest: "/root/mesh-gateway-policy.hcl"
+  when: DC_MGMT in group_names and CONSUL_VM_ACL_ENABLED|bool and CONSUL_MESH_GATEWAY_ENABLED|bool
+
+- name: Create a Mesh Gateway policy using the file /root/mesh-gateway-policy.hcl already present in - {{ groups[DC_MGMT] }}
+  become: true
+  when: DC_MGMT in group_names and CONSUL_VM_ACL_ENABLED|bool and CONSUL_MESH_GATEWAY_ENABLED|bool
+  ansible.builtin.shell:
+    cmd: >
+      . ~/.bashrc 2>/dev/null \
+      && consul acl policy create \
+          {% if 'ent' in CONSUL_VM_VERSION %} -partition "default" -namespace "default" {% endif %} \
+          -name "mesh-gateway-policy" -rules @/root/mesh-gateway-policy.hcl -description "Mesh gateway policy" \
+      && consul acl token create \
+          {% if 'ent' in CONSUL_VM_VERSION %} -partition "default" -namespace "default" {% endif %}  \
+          -description "Mesh Gateway Token" -policy-name "mesh-gateway-policy" > /root/mesh-gateway-token.txt
 
 - name: Query consul members
   when: DC_MGMT in group_names
@@ -226,9 +231,5 @@
   register: "consul_members"
   ansible.builtin.shell:
     cmd: . ~/.bashrc 2>/dev/null && consul members 
-  #environment:
-    #CONSUL_HTTP_SSL_VERIFY: "false"
-    #CONSUL_HTTP_ADDR: "{{ CONSUL_HTTP_ADDR_LOC }}"
 
 - debug: var=consul_members
-

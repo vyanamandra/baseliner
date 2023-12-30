@@ -1,4 +1,5 @@
-# Task that will be used to Launch/Create an EC2 Instance
+---
+# Task that will be used to install python and create a virtualenv on the newly provisioned nodes.
 
 - name: Update apt cache
   become: true

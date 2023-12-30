@@ -1,4 +1,5 @@
-# Task that will be used to Launch/Create an EC2 Instance
+---
+# Task that will be used to install Consul on the newly provisioned nodes
 
 - name: Wait for system to become reachable 
   ansible.builtin.wait_for_connection:

@@ -14,33 +14,37 @@
       extensions:
         - 'yml'
 
-  - name: Provision EC2 nodes for Consul DC1
+  - name: Provision nodes for Consul DC1
     include_role:
-      name: 'roles/provision-ec2'
-    when: CONSUL_VM_EC2_DC1_PROVISION | bool
+      name: 'roles/provision-nodes'
+    when: CONSUL_VM_DC1_PROVISION | bool
     vars:
         DC_ROLE: "consul"
         DC: "DC1"
 
-  - name: Provision EC2 nodes for Consul DC2 if required
+  - name: Provision nodes for Consul DC2 if required
     include_role:
-      name: 'roles/provision-ec2'
-    when: CONSUL_VM_EC2_DC2_PROVISION | bool
+      name: 'roles/provision-nodes'
+    when: CONSUL_VM_DC2_PROVISION | bool
     vars:
         DC_ROLE: "consul"
         DC: "DC2" 
 
-  - name: Provision EC2 nodes for Consul DC3 if required
+  - name: Provision nodes for Consul DC3 if required
     include_role:
-      name: 'roles/provision-ec2'
-    when: CONSUL_VM_EC2_DC3_PROVISION | bool
+      name: 'roles/provision-nodes'
+    when: CONSUL_VM_DC3_PROVISION | bool
     vars:
        DC_ROLE: "consul"
        DC: "DC3" 
 
-  - name: Pause for 2 minutes to allow machines to be ready. NEEDS_A_BETTER_APPROACH
-    ansible.builtin.pause:
-      minutes: 2
+  - name: Wait for SSH to come up on the newly created EC2 nodes
+    local_action: wait_for
+                  host={{ hostvars[item]['ansible_host'] }}
+                  port=22
+                  state=started
+    with_items: "{{ groups['consul_nodes'] }}"
+
 
 - name: Install required packages
   hosts: all
@@ -60,36 +64,36 @@
   - name: Install Consul binary all provisioned nodes for Consul
     include_role:
       name: 'roles/install-consul'
-    when: CONSUL_VM_EC2_DC1_ENABLED | bool
+    when: CONSUL_VM_DC1_ENABLED | bool
 
   - name: Install Envoy binary on all provisioned nodes, required only on agent nodes running sidecars
     include_role:
       name: 'roles/install-envoy'
-    when: CONSUL_VM_EC2_DC1_ENABLED | bool
+    when: CONSUL_VM_DC1_ENABLED | bool
 
   - name: Install Python 3.x and virtualenv on all provisioned nodes, required only on nodes running custom python apps
     include_role:
       name: 'roles/install-python'
-    when: CONSUL_VM_EC2_DC1_ENABLED | bool
+    when: CONSUL_VM_DC1_ENABLED | bool
 
   - name: Setup consul server agent configs in DC1, client agent configs and create required dirs
     include_role:
       name: 'roles/setup-consul-config'
-    when: CONSUL_VM_EC2_DC1_ENABLED | bool
+    when: CONSUL_VM_DC1_ENABLED | bool
     vars:
         DC: "DC1"
 
   - name: Setup consul server agent configs in DC2, client agent configs and create required dirs
     include_role:
       name: 'roles/setup-consul-config'
-    when: CONSUL_VM_EC2_DC2_ENABLED | bool
+    when: CONSUL_VM_DC2_ENABLED | bool
     vars:
         DC: "DC2"
 
   - name: Setup consul server agent configs in DC3, client agent configs and create required dirs
     include_role:
       name: 'roles/setup-consul-config'
-    when: CONSUL_VM_EC2_DC3_ENABLED | bool
+    when: CONSUL_VM_DC3_ENABLED | bool
     vars:
         DC: "DC3"
 
@@ -101,14 +105,14 @@
   - name: Connect the DCs using a Mesh Gateway (with mode local)
     include_role:
       name: 'roles/consul-join-clusters-gateway'
-    when: CONSUL_GATEWAY_MESH_ENABLED | bool
+    when: CONSUL_MESH_GATEWAY_ENABLED | bool
 
 ##  - name: Install Venus Python Apps and register those with Consul.
 ##    include_role:
 ##      name: 'roles/venus-py'
-##    when: CONSUL_VM_EC2_ENABLED | bool
+##    when: CONSUL_VM_ENABLED | bool
 #
 ##  - name: Start Venus Python Apps and their sidecars
 ##    include_role:
 ##      name: 'roles/venus-py-scs'
-##   when: CONSUL_VM_EC2_ENABLED | bool
+##   when: CONSUL_VM_ENABLED | bool
