@@ -1,15 +1,20 @@
 ---
 # tasks file for provisioning nodes
 
+- name: Debug print CLOUD_TYPE and DC
+  debug:
+    msg: "{{ CLOUD_TYPE }}"
+
 - name: Create the output/utils/vm-{{ DC_NORM }} directory
   ansible.builtin.file:
     path: 'output/utils/vm-{{ DC_NORM }}'
     state: directory
+  when: CONSUL_VM_PROVISION | bool
 
 - name: Fill and place utils/vm-{{ DC_NORM }}/create_machines.tf in output/utils/vm-{{ DC_NORM }}
   ansible.builtin.template:
-    src: 'create_machines-{{ CLOUD_TYPE }}.tf'
-    dest: 'output/utils/vm-{{ DC_NORM }}'
+    src: 'create_machines-{{ CLOUD_TYPE }}.tf.j2'
+    dest: 'output/utils/vm-{{ DC_NORM }}/create_machines-{{ CLOUD_TYPE }}.tf'
     mode: '0644'
   when: CONSUL_VM_PROVISION | bool
 

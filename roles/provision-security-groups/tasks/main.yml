@@ -1,0 +1,35 @@
+---
+# tasks file for provision-security-groups
+- name: Create the output/utils/aws directory
+  run_once: true
+  ansible.builtin.file:
+    path: 'output/utils/aws'
+    state: directory
+  when: ('aws' in CONSUL_VM_DC1_CLOUD_TYPE or 'aws' in CONSUL_VM_DC2_CLOUD_TYPE or 'aws' in CONSUL_VM_DC3_CLOUD_TYPE)
+
+- name: Fill and place utils/aws/create_security_group_aws.tf in output/utils/aws
+  run_once: true
+  ansible.builtin.template:
+    src: 'create_security_group_aws.tf.j2'
+    dest: 'output/utils/aws/create_security_group_aws.tf'
+    mode: '0644'
+  when: ('aws' in CONSUL_VM_DC1_CLOUD_TYPE or 'aws' in CONSUL_VM_DC2_CLOUD_TYPE or 'aws' in CONSUL_VM_DC3_CLOUD_TYPE)
+
+- name: Run Terraform to provision a security group. Ignore if it already exists.
+  run_once: true
+  block:
+    - name: Provision a security group in aws
+      terraform:
+        project_path: 'output/utils/aws'
+        force_init: true
+        state: present
+      when: ('aws' in CONSUL_VM_DC1_CLOUD_TYPE or 'aws' in CONSUL_VM_DC2_CLOUD_TYPE or 'aws' in CONSUL_VM_DC3_CLOUD_TYPE)
+      register: provision_security_group_output
+  rescue:
+    - name: Check ansible_failed_result to see if it is a duplicate. True if it skips
+      when: ((ansible_failed_task.name == 'Provision a security group in aws') and ('Duplicate' not in provision_security_group_output['msg']))
+      fail:
+        msg: 'The security group creation failed, and it did not fail for an "Already Exists" error'
+    
+
+

@@ -4,8 +4,23 @@
   tasks:
 
   - name: Verify name resolution
-    include_role:
+    include_role: 
       name: 'roles/check-dynamic-vars'
-    vars:
-        DC_ROLE: "consul"
-        DC: "dc1"
+
+  # - name: Get current logged in user
+  #   debug:
+  #     msg: "{{ ansible_user_id }}"
+  
+  # - name: Set fact my_str as "venus"
+  #   set_fact:
+  #     my_str: "venus"
+
+  # - name: Set common fact min_str as "venus"
+  #   set_fact:
+  #     min_str: "{{ '\"' + ansible_user_id + '-baseliner-sg\"' }}"
+
+  # - name: Display custom string
+  #   debug:
+  #     #msg: "[{ min_str + ', \"'+ my_str + '1234\"' }}]"
+  #     msg: "{% \"[ \" +  min_str + ', \"'+ my_str + '1234\"']" if 'venus' in my_str else "[]" %}
+

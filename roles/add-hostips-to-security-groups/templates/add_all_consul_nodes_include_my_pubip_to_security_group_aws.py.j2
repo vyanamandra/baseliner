@@ -1,0 +1,63 @@
+import boto3
+from requests import get
+
+ec2 = boto3.client('ec2')
+
+def add_ips_to_security_group(security_group_name, ip_addresses_hostnames):
+    ec2 = boto3.client('ec2')
+    response = ec2.describe_security_groups(
+        Filters=[
+            dict(Name='group-name', Values=[security_group_name])
+        ]
+    )
+    security_group_id = response['SecurityGroups'][0]['GroupId']
+
+    try:
+        ec2_sg_resource = boto3.resource('ec2')
+        security_group = ec2_sg_resource.SecurityGroup(security_group_id)
+        security_group.revoke_ingress(IpPermissions=security_group.ip_permissions)
+    except:
+        print ('Exception in revoking all rules from the security group. check later.')
+    
+    
+    # Add your public IP to the list
+    public_ip = get('https://api.ipify.org').text
+    ip_addresses_hostnames.append((f"{public_ip}/32", 'user: {{ ansible_user_id }}'))
+
+    # Get the default VPC
+    vpcs = ec2.describe_vpcs(Filters=[{'Name': 'isDefault', 'Values': ['true']}])
+    default_vpc_id = vpcs['Vpcs'][0]['VpcId'] if vpcs['Vpcs'] else None
+    
+    if not default_vpc_id:
+        return "No default VPC found."
+    
+    # Get subnets for the default VPC
+    subnets = ec2.describe_subnets(Filters=[{'Name': 'vpc-id', 'Values': [default_vpc_id]}])
+    subnet_cidrs = [subnet['CidrBlock'] for subnet in subnets['Subnets']]
+    
+    for cidr in subnet_cidrs:
+        ip_addresses_hostnames.append((f"{cidr}", 'subnet cidr'))
+
+    # Prepare the permissions structure
+    permissions = [{
+        'IpProtocol': '-1', # Allow every protocol
+        'FromPort': 1,  # Allow all 
+        'ToPort': 65535,    # ports
+        'IpRanges': [{'CidrIp': ip_host[0], 'Description': 'Allowed IP for - ' + ip_host[1]} for ip_host in ip_addresses_hostnames]
+    }]
+
+    # Update the security group
+    response = ec2.authorize_security_group_ingress(
+        GroupId=security_group_id,
+        IpPermissions=permissions
+    )
+    return response
+
+if __name__ == '__main__':
+  security_group_name = "{{ ansible_user_id + '-baseliner-sg' }}"
+  ip_addresses_hostnames = []
+  {% for server in groups['consul_nodes'] %}
+ip_addresses_hostnames.append(("{{ hostvars[server]['ansible_host'] }}/32", "{{ hostvars[server]['inventory_hostname'] }}"))
+  {% endfor %} 
+  response = add_ips_to_security_group(security_group_name, ip_addresses_hostnames)
+  print(response)

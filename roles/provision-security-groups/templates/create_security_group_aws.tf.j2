@@ -1,0 +1,32 @@
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 4.16"
+    }
+  }
+
+  required_version = ">= 1.2.0"
+}
+
+variable "loggedin_user_security_group_name" {
+  default = "{{ ansible_user_id + '-baseliner-sg' }}"
+}
+
+resource "aws_security_group" "project_team_security_group" {
+  name        = var.loggedin_user_security_group_name
+  description = "Allow limited traffic - Managed by baseliner terraform scripts. Do not perform any changes in the UI"
+  # Unset vpc_id so it can use the default one
+  # vpc_id      = aws_vpc.project_team_vpc.id
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = var.loggedin_user_security_group_name
+  }
+}
