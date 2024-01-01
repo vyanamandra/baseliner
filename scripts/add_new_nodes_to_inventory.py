@@ -28,7 +28,7 @@ def main(args):
 	config = configparser.ConfigParser(allow_no_value = True)
 	config.read(inventory)
 	
-	remove_config_section_if_exists(config, args.datacenter, ['nodes', 'servers', 'clients', 'mgmt'])
+	remove_config_section_if_exists(config, args.datacenter, ['nodes', 'servers', 'clients', 'mgmt', 'mgw'])
 
 	config[f'{args.datacenter}_nodes'] = {}
 	nid = 0
@@ -58,6 +58,9 @@ def main(args):
 
 	config[f'{args.datacenter}_mgmt'] = {}
 	config[f'{args.datacenter}_mgmt'][f'{args.datacenter}_node0'] = None
+
+	config[f'{args.datacenter}_mgw'] = {}
+	config[f'{args.datacenter}_mgw'][f'{args.datacenter}_node{num_servers+num_clients-1}'] = None
 
 	with open(inventory, 'w') as config_file:
 		config.write(config_file, space_around_delimiters=False)

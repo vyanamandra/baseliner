@@ -1,0 +1,15 @@
+---
+# tasks file for add-hostips-to-security-groups
+
+- name: Add all host ips to the security group in AWS if necessary.
+  run_once: true
+  ansible.builtin.template: 
+    src: 'add_all_consul_nodes_include_my_pubip_to_security_group_aws.py.j2'
+    dest: 'output/utils/add_all_consul_nodes_include_my_pubip_to_security_group_aws.py'
+  when: ('aws' in CONSUL_VM_DC1_CLOUD_TYPE or 'aws' in CONSUL_VM_DC2_CLOUD_TYPE or 'aws' in CONSUL_VM_DC3_CLOUD_TYPE)
+
+- name: Run the script - output/utils/add_all_consul_nodes_include_my_pubip_to_security_group_aws.py if there is even one AWS based Dif there is even one AWS based DC.
+  ansible.builtin.shell:
+    cmd: python output/utils/add_all_consul_nodes_include_my_pubip_to_security_group_aws.py
+  run_once: true
+  when: ('aws' in CONSUL_VM_DC1_CLOUD_TYPE or 'aws' in CONSUL_VM_DC2_CLOUD_TYPE or 'aws' in CONSUL_VM_DC3_CLOUD_TYPE)
