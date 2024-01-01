@@ -6,4 +6,12 @@ but, stay tuned!
 
 
 The goal is to get some resiliency on failures.
-Possible ETA: To complete the work by today evening & merge it to the main branch.
+
+Tasks to be addressed in this branch:
+1. Provisioning in AWS (nodes, security groups, ingress rules) - [Done]
+2. Installing Consul.
+3. Installing Envoy.
+4. Installing Python pip & virtualenvs.
+5. Setting up Consul (like, what if it is already working. say, there is a file that says /root/setup-complete-donodisturb) [This covers- gossip-enc, tls & acl]
+6. Setting up a traditional gateway.
+7. Setting up a mesh gateway.
