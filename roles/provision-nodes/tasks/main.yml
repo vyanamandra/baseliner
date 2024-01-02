@@ -1,9 +1,9 @@
 ---
 # tasks file for provisioning nodes
 
-- name: Debug print CLOUD_TYPE and DC
-  debug:
-    msg: "{{ CLOUD_TYPE }}"
+# - name: Debug print CLOUD_TYPE and DC
+#   debug:
+#     msg: "{{ CLOUD_TYPE }}"
 
 - name: Create the output/utils/vm-{{ DC_NORM }} directory
   ansible.builtin.file:

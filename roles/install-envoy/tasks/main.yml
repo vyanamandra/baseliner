@@ -3,24 +3,24 @@
 
 - name: Install func-e
   become: true
-  when: "'consul_nodes' in group_names"
+  when: ('consul_nodes' in group_names)
   ansible.builtin.shell:
     cmd: curl https://func-e.io/install.sh | bash -s -- -b /usr/local/bin
 
 - name: func-e use to get the required Envoy version
   become: true
-  when: "'consul_nodes' in group_names"
+  when: ('consul_nodes' in group_names)
   ansible.builtin.shell:
     cmd: func-e use {{ CONSUL_ENVOY_VERSION }}
 
 - name: Move envoy binary to /usr/local/bin
   become: true
-  when: "'consul_nodes' in group_names"
+  when: ('consul_nodes' in group_names)
   ansible.builtin.shell:
     cmd: mv ~/.func-e/versions/1.25.11/bin/envoy /usr/local/bin/envoy
 
 - name: Check envoy version
   become: true
-  when: "'consul_nodes' in group_names"
+  when: ('consul_nodes' in group_names)
   ansible.builtin.shell:
     cmd: envoy --version

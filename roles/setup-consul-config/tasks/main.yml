@@ -89,11 +89,11 @@
   become: true
   file: dest=/opt/consul owner=consul group=consul recurse=yes
 
-- debug: var=inventory_hostname
+#- debug: var=inventory_hostname
 
-- debug: var=group_names
+#- debug: var=group_names
 
-- debug: var=groups[DC_MGMT]
+#- debug: var=groups[DC_MGMT]
 
 - name: Arrive at an encrypt string to be used on all nodes of the cluster for gossip encryption
   become: true
@@ -108,16 +108,17 @@
   when: (CONSUL_VM_GOSSIP_ENABLED|bool and DC_MGMT in group_names)
 
 - name: Transfer hcl files to /etc/consul.d/
+  become: true
   template:
     src: "{{ item }}"
     dest: /etc/consul.d/{{ item | basename | regex_replace('\.j2$', '') }}
   with_fileglob:
     - "{{ playbook_dir }}/roles/consul-common-templates/templates/*.j2"
   when: DC_NODES in group_names
-  become: true
 
 
 - name: Transfer Consul server config to the consul server nodes
+  become: true
   template:
     src: "{{ playbook_dir }}/roles/consul-common-templates/templates/srv/consul-server.hcl.j2"
     dest: /etc/consul.d/consul.hcl
@@ -125,9 +126,9 @@
     group: consul
     mode: "u=rw,g=r,o=r"
   when: DC_SERVERS in group_names
-  become: true
 
 - name: Transfer Consul client config to the consul client nodes
+  become: true
   template:
     src: "{{ playbook_dir }}/roles/consul-common-templates/templates/cli/consul-client.hcl.j2"
     dest: /etc/consul.d/consul.hcl
@@ -135,9 +136,8 @@
     group: consul
     mode: "u=rw,g=r,o=r"
   when: DC_CLIENTS in group_names
-  become: true
 
-- name: Replace single quotes with double quotes - {{ DC_NODES }} - {{ group_names }}
+- name: Replace single quotes with double quotes on {{ DC_NODES }}
   become: true
   when: DC_NODES in group_names
   ansible.builtin.shell:
@@ -150,7 +150,13 @@
     name: consul
     state: restarted
 
-- name: Bootstrap consul
+- name: Ensure that the consul service started and that there is a leader already before bootstrapping. Try this loop for 30 times if needed.
+  become: true
+  when: (CONSUL_VM_ACL_ENABLED|bool and DC_MGMT in group_names)
+  ansible.builtin.shell:
+    cmd: for x in $(seq 1 30); do if [[ $(curl -sk {{CONSUL_HTTP_ADDR_LOC}}/v1/internal/ui/services -o-) =~ '[]' ]]; then echo 'This consul cluster has a new leader'; break; else echo 'The cluster is yet to elect a new leader. Sleeping for 5 seconds before checking again'; fi; done
+
+- name: Bootstrap consul now that there is a new leader
   become: true
   when: (CONSUL_VM_ACL_ENABLED|bool and DC_MGMT in group_names)
   register: "bootstrap_token"
@@ -160,20 +166,30 @@
     CONSUL_HTTP_SSL_VERIFY: "false"
     CONSUL_HTTP_ADDR: "{{ CONSUL_HTTP_ADDR_LOC }}"
   
-- debug: var=bootstrap_token
+- name: Print the boostrap token of the datacenter <{{ DC_NAME }}> to stdout for reference.
+  debug: 
+    msg: "Bootstrap token is: <{{ bootstrap_token['stdout'] }}>"
+  when: (CONSUL_VM_ACL_ENABLED|bool and DC_MGMT in group_names)
 
 - name: Set bootstrap_token_{{ DC_NORM }}
   set_fact:
     bootstrap_token_{{ DC_NORM }}: "{{ bootstrap_token['stdout'] }}"
   when: (CONSUL_VM_ACL_ENABLED|bool and DC_MGMT in group_names)
 
-- name: Copy the bootstrap token to ~/.bashrc of the root user
+
+- name: Remove the prior CONSUL_HTTP_TOKEN, CONSUL_HTTP_SSL_VERIFY, CONSUL_HTTP_ADDR env vars from ~/.bashrc
+  when: (CONSUL_VM_ACL_ENABLED|bool and DC_NODES in group_names)
+  become: true
+  ansible.builtin.shell:
+    cmd: sed -i '/^export CONSUL_HTTP_TOKEN/d;/^export CONSUL_HTTP_SSL_VERIFY/d;/^export CONSUL_HTTP_ADDR/d' ~/.bashrc
+
+- name: Save the bootstrap token to ~/.bashrc of the root user
   when: (CONSUL_VM_ACL_ENABLED|bool and DC_NODES in group_names)
   become: true
   ansible.builtin.shell:
     cmd: echo "export CONSUL_HTTP_TOKEN={{ groups[DC_MGMT] | map('extract', hostvars, 'bootstrap_token_' + DC_NORM) | list | join('') }}" >> ~/.bashrc
 
-- name: Set CONSUL_HTTP_ADDR and CONSUL_HTTP_SSL_VERIFY values in .bashrc of root
+- name: Save CONSUL_HTTP_ADDR and CONSUL_HTTP_SSL_VERIFY values in .bashrc of the root user. Ideally want this to be from /etc/profile
   when: DC_NODES in group_names
   become: true
   ansible.builtin.shell:
