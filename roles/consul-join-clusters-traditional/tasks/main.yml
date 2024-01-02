@@ -43,19 +43,19 @@
   become: true
   ansible.builtin.shell:
    cmd: echo "{{ groups[PRIMARY_DC_MGMT] | map('extract', hostvars, 'mgmt_tls_ca_pem_dc1') | map(attribute='stdout', default='') | list | select | join('') }}" >> /opt/consul/tls/consul-agent-ca.pem
-  when: CONSUL_VM_TLS_ENABLED|bool and inventory_hostname in ((groups[SECONDARY_DC2_NODES] if CONSUL_VM_DC2_ENABLED|bool else [] + groups[SECONDARY_DC3_NODES] if CONSUL_VM_DC3_ENABLED|bool else [])|unique)
+  when: CONSUL_VM_TLS_ENABLED|bool and (inventory_hostname in (((groups[SECONDARY_DC2_NODES] if CONSUL_VM_DC2_ENABLED|bool else []) + (groups[SECONDARY_DC3_NODES] if CONSUL_VM_DC3_ENABLED|bool else []))|unique))
 
-- name: Append DC2 CA.pem contents to DC3 and DC1 CA.PEM files - {{ PRIMARY_DC_NODES }} - {{ (((groups[SECONDARY_DC3_NODES] if (CONSUL_VM_DC2_ENABLED|bool) else []) + groups[PRIMARY_DC_NODES])|unique) }}
+- name: Append DC2 CA.pem contents to DC3 and DC1 CA.PEM files
   become: true
   ansible.builtin.shell:
    cmd: echo "{{ groups[SECONDARY_DC2_MGMT] | map('extract', hostvars, 'mgmt_tls_ca_pem_dc2') | map(attribute='stdout', default='') | list | select | join('') }}" >> /opt/consul/tls/consul-agent-ca.pem
-  when: CONSUL_VM_TLS_ENABLED|bool and inventory_hostname in (((groups[SECONDARY_DC3_NODES] if (CONSUL_VM_DC3_ENABLED|bool) else []) + groups[PRIMARY_DC_NODES])|unique)
+  when: CONSUL_VM_TLS_ENABLED|bool and (inventory_hostname in (((groups[SECONDARY_DC3_NODES] if CONSUL_VM_DC3_ENABLED|bool else []) + groups[PRIMARY_DC_NODES])|unique))
 
-- name: Append DC3 CA.pem contents to DC1 and DC2 CA.PEM files - {{ (((groups[SECONDARY_DC2_NODES] if (CONSUL_VM_DC2_ENABLED|bool) else []) + groups[PRIMARY_DC_NODES])|unique) }}
+- name: Append DC3 CA.pem contents to DC1 and DC2 CA.PEM files
   become: true
   ansible.builtin.shell:
-   cmd: echo "{{ groups[SECONDARY_DC3_MGMT] if CONSUL_VM_DC3_ENABLED|bool else [] | map('extract', hostvars, 'mgmt_tls_ca_pem_dc3') | map(attribute='stdout', default='') | list | select | join('') }}" >> /opt/consul/tls/consul-agent-ca.pem
-  when: CONSUL_VM_TLS_ENABLED|bool and inventory_hostname in (((groups[SECONDARY_DC2_NODES] if (CONSUL_VM_DC2_ENABLED|bool) else []) + groups[PRIMARY_DC_NODES])|unique)
+   cmd: echo "{{ groups[SECONDARY_DC3_MGMT] | map('extract', hostvars, 'mgmt_tls_ca_pem_dc3') | map(attribute='stdout', default='') | list | select | join('') }}" >> /opt/consul/tls/consul-agent-ca.pem
+  when: CONSUL_VM_TLS_ENABLED|bool and CONSUL_VM_DC3_ENABLED|bool and (inventory_hostname in (((groups[SECONDARY_DC2_NODES] if CONSUL_VM_DC2_ENABLED|bool else []) + groups[PRIMARY_DC_NODES])|unique))
 
 - name: Add a new line to ca.pem
   become: true 
@@ -150,10 +150,10 @@
   become: true
   when: PRIMARY_DC_MGMT in group_names and CONSUL_VM_ACL_ENABLED|bool
   ansible.builtin.shell:
-    cmd: . ~/.bashrc 2>/dev/null && consul acl token list | grep 'Bootstrap Token' -B1 | grep SecretID | awk '{print $2}'
+    cmd: . ~/.bashrc 2>/dev/null && echo $CONSUL_HTTP_TOKEN
   register: primary_bootstrap_token
 
-- name: Set the bootstrap token within .bashrc of all Consul Nodes
+- name: Replace the bootstrap token within .bashrc of all Consul Nodes to the one from the primary dc.
   become: true
   when: ("consul_nodes" in group_names) and CONSUL_VM_ACL_ENABLED|bool
   ansible.builtin.shell:
@@ -170,8 +170,3 @@
   become: true
   ansible.builtin.shell:
     cmd: . ~/.bashrc 2>/dev/null && sleep 60 && consul acl set-agent-token agent $(cat /root/agent-token-after-federation.txt) && rm -f /root/agent-token-after-federation.txt
-
-
-
-
-

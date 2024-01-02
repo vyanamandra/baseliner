@@ -1,63 +1,75 @@
 ---
 # Task that will be used to install Consul on the newly provisioned nodes
-
-- name: Wait for system to become reachable 
-  ansible.builtin.wait_for_connection:
-    timeout: 120
-  when: "'consul_nodes' in group_names"
-
-#- name: get private ip of each of the hosts
-#  register: "private_ip"
-#  become: true
-#  when: "'consul_nodes' in group_names"
-#  ansible.builtin.shell:
-#    cmd: hostname -i
-
-#- name: display the value of private_ip
-#  debug:
-#    var: private_ip['stdout'] | flatten
-
-- name: rm -f hashicorp-archive-keyring.gpg
+- name: Check if this is a ubuntu machine since most of our initial ramp until setting up consul config is based off Ubuntu/Debian.
   become: true
-  when: "'consul_nodes' in group_names"
+  when: ('consul_nodes' in group_names)
+  ansible.builtin.shell:
+    cmd: bash -c '[[ $(lsb_release -ds) =~ "Ubuntu" ]]'
+
+- name: rm -f /usr/share/keyrings/hashicorp-archive-keyring.gpg
+  become: true
+  when: ('consul_nodes' in group_names)
   ansible.builtin.shell:
     cmd: rm -f /usr/share/keyrings/hashicorp-archive-keyring.gpg
 
-- name: Wget hashicorp-archive-keyring.gpg
+- name: wget hashicorp-archive-keyring.gpg from https://apt.releases.hashicorp.com/gpg
   become: true
-  when: "'consul_nodes' in group_names"
+  when: ('consul_nodes' in group_names)
   ansible.builtin.shell:
     cmd: wget -O- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
 
 - name: Add hashicorp repo to sources list
   become: true
-  when: "'consul_nodes' in group_names"
+  when: ('consul_nodes' in group_names)
   ansible.builtin.shell:
     cmd: echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
 
 - name: Update apt cache
   become: true
-  when: "'consul_nodes' in group_names"
+  when: ('consul_nodes' in group_names)
   apt:
     update_cache: yes
 
+- name: stop consul  if it exists. Hence, ignore the return code from systemctl stop consul
+  become: true
+  shell:
+    cmd: systemctl stop consul 2>/dev/null || /usr/bin/true
+  when: ('consul_nodes' in group_names)
+
+- name: Remove the consul package if it exists. apt absent is the safe way.
+  become: true
+  when: ('consul_nodes' in group_names)
+  ansible.builtin.apt:
+    name: consul
+    state: absent
+
+- name: Empty out the contents of /opt/consul directory
+  become: true
+  shell:
+    cmd: rm -rf /opt/consul
+  when: ('consul_nodes' in group_names)
+
+- name: Remove all hcl files from /etc/consul.d directory
+  become: true
+  shell:
+    cmd: rm -rf /etc/consul.d/*.hcl
+  when: ('consul_nodes' in group_names)
+
 - name: Install the latest consul package
   become: true
-  when: "'consul_nodes' in group_names"
+  when: ('consul_nodes' in group_names)
   ansible.builtin.apt:
     name: consul
     state: present
 
-
 - name: Comment out Type from consul service definition file
   become: true
-  when: "'consul_nodes' in group_names"
+  when: ('consul_nodes' in group_names)
   ansible.builtin.shell:
     cmd: sed -i 's/^Type=notify/#Type=notify/g' /lib/systemd/system/consul.service
-
 
 - name: Just force systemd to reread configs (2.4 and above)
   become: true
   ansible.builtin.shell:
     cmd: systemctl daemon-reload
-  when: "'consul_nodes' in group_names"
+  when: ('consul_nodes' in group_names)
