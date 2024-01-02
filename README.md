@@ -1,17 +1,22 @@
 # baseliner
 An easy deployment &amp; demo of applications for Consul over VMs.
 
---> Work in progress. The code needs to be made resilient on failures (e.g., unable to bootstrap, unable to run a specific task... etc,) and it is not right now. 
-but, stay tuned!
+--> Work in progress. 
+
+Need to add custom applications to this now.
+
+Along the way, we will add -
+
+1. Ingress gateways.
+2. Terminating gateways.
+3. API gateways.
+4. All custom applications and tools for troubleshooting.
+5. Cluster Peering.
+6. Admin partitions.
 
 
-The goal is to get some resiliency on failures.
+Then, we will proceed to add support for Azure and GCP.
 
-Tasks to be addressed in this branch:
-1. Provisioning in AWS (nodes, security groups, ingress rules) - [Done]
-2. Installing Consul.
-3. Installing Envoy.
-4. Installing Python pip & virtualenvs.
-5. Setting up Consul (like, what if it is already working. say, there is a file that says /root/setup-complete-donodisturb) [This covers- gossip-enc, tls & acl]
-6. Setting up a traditional gateway.
-7. Setting up a mesh gateway.
+In mind is to add support for joining DCs in different regions of the same cloud. e.g., one DC from the us-east-1 region while the other from the us-west-2 region of AWS.
+
+
