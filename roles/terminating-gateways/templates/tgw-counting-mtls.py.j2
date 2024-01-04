@@ -1,0 +1,53 @@
+from flask import Flask, request, abort, make_response, jsonify
+from OpenSSL import crypto
+import ssl
+import socket
+
+SUCCESSFUL_RESPONSE = 200
+HOSTNAME = socket.gethostname()
+
+total_requests_served_since_startup = 0
+
+app = Flask(__name__)
+
+def validate_cn():
+    global total_requests_served_since_startup
+    total_requests_served_since_startup += 1
+    client_cert = request.environ.get('SSL_CLIENT_CERT')
+    if client_cert:
+        x509 = crypto.load_certificate(crypto.FILETYPE_PEM, client_cert)
+        subject = x509.get_subject()
+        cn = subject.CN
+
+        print (f'Venus: Common name from the client cert is: <{cn}>')
+
+        #if cn != 'venus-clients.com':
+        #    abort(403)  # Forbidden access
+
+@app.before_request
+def before_request():
+    validate_cn()
+
+@app.route('/health')
+def health():
+    ret = {}
+    ret['response'] = 'healthy'
+    ret['hostname'] = HOSTNAME
+    ret['inside_function'] = f"{__file__}['{health.__name__}']"
+    return make_response(jsonify(ret), SUCCESSFUL_RESPONSE)
+
+@app.route('/count')
+def count():
+    ret = {}
+    ret['hostname'] = HOSTNAME
+    ret['total_requests_count'] = total_requests_served_since_startup
+    ret['inside_function'] = f"{__file__}['{count.__name__}']"
+    return make_response(jsonify(ret), SUCCESSFUL_RESPONSE)
+
+
+if __name__ == '__main__':
+    context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
+    context.verify_mode = ssl.CERT_REQUIRED
+    context.load_verify_locations('venus-cli.com.crt')
+    context.load_cert_chain('venus-srv.com.crt', 'venus-srv.com.key')
+    app.run('0.0.0.0', {{TGW_COUNTING_MTLS_PORT}}, ssl_context=context)

@@ -1,2 +1,7 @@
 ---
 # defaults file for vm-ec2
+CONSUL_VM_AMI_IMAGE_DEFAULT: "ami-03f65b8614a860c29"
+CONSUL_VM_KEY_NAME_DEFAULT: "amy-test"
+CONSUL_VM_INSTANCE_TYPE_DEFAULT: "t3.medium"
+CONSUL_VM_NAME_TAG_PREFIX_DEFAULT: "venus"
+CONSUL_VM_SSH_PRIV_KEY_FILE_DEFAULT: "/Users/vyanamandra/.ssh/amy-test.pem"

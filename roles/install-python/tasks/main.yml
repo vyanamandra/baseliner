@@ -38,3 +38,9 @@
   ansible.builtin.shell:
     cmd: sed -i '/\/root\/venv\/bin\/activate/d' /root/.bashrc && echo '. /root/venv/bin/activate' >> /root/.bashrc
   when: ('consul_nodes' in group_names)
+
+- name: Install flask, requests, pyopenssl, flask-bootstrap packages using pip
+  become: true
+  ansible.builtin.shell:
+    cmd: . ~/.bashrc 2>/dev/null && pip install flask requests pyopenssl flask-bootstrap 
+  when: ('consul_nodes' in group_names)

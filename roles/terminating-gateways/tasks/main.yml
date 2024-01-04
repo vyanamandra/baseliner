@@ -1,0 +1,22 @@
+---
+# tasks file for terminating-gateways
+
+# Shutdown Consul on one of the client nodes. - just to ensure we are not in the mesh. but it does not matter to a trained eye to spot the working of a terminating gateway.
+
+# Set up a basic client app on that node selected from above.
+
+
+# Generate self signed certificates for servers and clients
+# cd /opt/consul/tls/
+# openssl req -x509 -newkey rsa:4096 -sha256 -days 365 -nodes -keyout venus-srv.com.key -out venus-srv.com.crt -subj "/CN=venus-servers.com"   -addext "subjectAltName=DNS:venus-srv.com,DNS:*.venus-srv.com,IP:10.0.0.2"
+# openssl req -x509 -newkey rsa:4096 -sha256 -days 365 -nodes -keyout venus-cli.com.key -out venus-cli.com.crt -subj "/CN=venus-clients.com"   -addext "subjectAltName=DNS:venus-cli.com,DNS:*.venus-srv.com,IP:192.168.2.3"
+
+
+# Set up a TLS based client app on that node.
+
+
+# Set up a mTLS based client app on that node.
+
+# Set up a TGW that can handle all the clients from above.
+
+# Set up a TGW o
