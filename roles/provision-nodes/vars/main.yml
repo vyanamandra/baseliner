@@ -1,13 +1,6 @@
 ---
-# vars file for vm-ec2
+# vars file for provision-nodes
 # Default values. Could always be overridden from env-selection
-#CONSUL_VM_AMI_IMAGE: ""
-#CONSUL_VM_KEY_NAME: ""
-#CONSUL_VM_INSTANCE_TYPE: "t3.medium"
-#CONSUL_VM_AWS_REGION: "us-west-2"
-#CONSUL_VM_SECURITY_GROUP: ""
-#CONSUL_VM_NAME_TAG_PREFIX: ""
-
 CONSUL_DC1_DC_PH: "DC1"
 CONSUL_DC2_DC_PH: "DC2"
 CONSUL_DC3_DC_PH: "DC3"
@@ -19,7 +12,16 @@ CONSUL_VM_DC3_PROVISION: "False"
 DC_NORM: "{{ vars['CONSUL_VM_' + DC + '_DATACENTER'] | replace('-', '_') }}"
 CLOUD_TYPE: "{{ vars['CONSUL_VM_' + DC + '_CLOUD_TYPE'] }}"
 CONSUL_VM_PROVISION: "{{ vars['CONSUL_VM_' + DC + '_PROVISION'] | bool }}"
+CONSUL_VM_AWS_REGION: "{{ vars['CONSUL_VM_' + DC + '_AWS_REGION'] }}"
+CONSUL_VM_AMI_IMAGE: "{{ vars['CONSUL_VM_' + DC + '_AMI_IMAGE'] }}"
 CONSUL_VM_ADDITIONAL_SECURITY_GROUP: "{{ vars['CONSUL_VM_' + DC + '_ADDITIONAL_SECURITY_GROUP'] }}"
+
+CONSUL_VM_KEY_NAME: "{{ vars['CONSUL_VM_' + DC + '_KEY_NAME'] }}"
+CONSUL_VM_INSTANCE_TYPE: "{{ vars['CONSUL_VM_' + DC + '_INSTANCE_TYPE'] }}"
+CONSUL_VM_NAME_TAG_PREFIX: "{{ vars['CONSUL_VM_' + DC + '_NAME_TAG_PREFIX'] }}"
+CONSUL_VM_OWNER_TAG: "{{ vars['CONSUL_VM_' + DC + '_OWNER_TAG'] }}"
+CONSUL_VM_SSH_PRIV_KEY_FILE: "{{ vars['CONSUL_VM_' + DC + '_SSH_PRIV_KEY_FILE'] }}"
+
 CONSUL_VM_DATACENTER: "{{ vars['CONSUL_VM_' + DC + '_DATACENTER'] }}"
 CONSUL_VM_ENABLED: "{{ vars['CONSUL_VM_' + DC + '_ENABLED'] | bool }}"
 CONSUL_VM_SERVER_COUNT: "{{ vars['CONSUL_VM_' + DC + '_SERVER_COUNT'] | int }}"

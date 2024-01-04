@@ -8,7 +8,7 @@
     dest: 'output/utils/add_all_consul_nodes_include_my_pubip_to_security_group_aws.py'
   when: ('aws' in CONSUL_VM_DC1_CLOUD_TYPE or 'aws' in CONSUL_VM_DC2_CLOUD_TYPE or 'aws' in CONSUL_VM_DC3_CLOUD_TYPE)
 
-- name: Run the script - output/utils/add_all_consul_nodes_include_my_pubip_to_security_group_aws.py if there is even one AWS based Dif there is even one AWS based DC.
+- name: Run the script - output/utils/add_all_consul_nodes_include_my_pubip_to_security_group_aws.py if there is even one AWS based DC
   ansible.builtin.shell:
     cmd: python output/utils/add_all_consul_nodes_include_my_pubip_to_security_group_aws.py
   run_once: true
