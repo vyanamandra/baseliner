@@ -1,0 +1,15 @@
+# /lib/systemd/system/tgw-app@.service
+[Unit]
+Description=Venus Custom Terminating Gateway Testing Apps
+After=network.target 
+AssertPathExists=/opt/consul/custom-apps/tgw
+AssertPathIsDirectory=/opt/consul/custom-apps/tgw/certs
+
+[Service]
+Type=simple
+ExecStart=/root/venv/bin/python /opt/consul/custom-apps/tgw/tgw-%i.py 
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

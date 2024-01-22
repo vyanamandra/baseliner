@@ -1,0 +1,26 @@
+{
+  "Node": "{{CURRENT_DC.stdout}}-ext-{{item.service}}-node",
+  "Address": "{{TGW_TEST_APP_NODE_IP.stdout}}",
+  "NodeMeta": {
+    "external-node": "true",
+    "external-probe": "true"
+  },
+  "Service": {
+    "ID": "{{CURRENT_DC.stdout}}-{{item.service}}",
+    "Service": "{{CURRENT_DC.stdout}}-ext-{{item.service}}",
+    "Port": {{item.port|int}}
+  },
+  "Checks": [
+    {
+      "Name": "{{CURRENT_DC.stdout}}-ext-{{item.service}}-check",
+      "Status": "passing",
+      "Definition": {
+        "Name": "{{CURRENT_DC.stdout}}-ext-{{item.service}} TCP check on port {{TGW_TEST_APP_NODE_IP.stdout}}:{{item.port}}",
+        "TCP": "{{TGW_TEST_APP_NODE_IP.stdout}}:{{item.port}}",
+        "Interval": "10s",
+        "Timeout": "1s"
+      }
+    }
+  ]
+}
+

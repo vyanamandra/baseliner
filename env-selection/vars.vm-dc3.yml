@@ -17,7 +17,6 @@ CONSUL_VM_DC3_NAME_TAG_PREFIX: "venus-dc3"
 CONSUL_VM_DC3_SSH_PRIV_KEY_FILE: "/Users/vyanamandra/.ssh/amy-test.pem"
 
 
-
 ###
 #CONSUL_VM_AMI_IMAGE: ""
 #CONSUL_VM_KEY_NAME: ""

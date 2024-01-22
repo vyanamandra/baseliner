@@ -1,1 +1,29 @@
+[venus_dc_nodes]
+venus_dc_node0 ansible_host=34.221.99.202 ansible_connection=ssh ansible_user=ubuntu ansible_private_key_file=/users/vyanamandra/.ssh/amy-test.pem
+venus_dc_node1 ansible_host=54.185.161.45 ansible_connection=ssh ansible_user=ubuntu ansible_private_key_file=/users/vyanamandra/.ssh/amy-test.pem
+venus_dc_node2 ansible_host=35.92.238.255 ansible_connection=ssh ansible_user=ubuntu ansible_private_key_file=/users/vyanamandra/.ssh/amy-test.pem
+venus_dc_node3 ansible_host=54.245.168.72 ansible_connection=ssh ansible_user=ubuntu ansible_private_key_file=/users/vyanamandra/.ssh/amy-test.pem
+venus_dc_node4 ansible_host=54.218.88.30 ansible_connection=ssh ansible_user=ubuntu ansible_private_key_file=/users/vyanamandra/.ssh/amy-test.pem
+
+[venus_dc_servers]
+venus_dc_node0
+venus_dc_node1
+venus_dc_node2
+
+[venus_dc_clients]
+venus_dc_node3
+venus_dc_node4
+
+[consul_nodes]
+venus_dc_node0
+venus_dc_node1
+venus_dc_node2
+venus_dc_node3
+venus_dc_node4
+
+[venus_dc_mgmt]
+venus_dc_node0
+
+[venus_dc_mgw]
+venus_dc_node4
 

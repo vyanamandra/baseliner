@@ -1,22 +1,360 @@
 ---
 # tasks file for terminating-gateways
 
-# Shutdown Consul on one of the client nodes. - just to ensure we are not in the mesh. but it does not matter to a trained eye to spot the working of a terminating gateway.
+# Setup variables for each of the nodes.
+- name: Setup CURRENT_DC 
+  become: true
+  ansible.builtin.shell:
+    cmd: grep -h '^datacenter' /etc/consul.d/*.hcl | cut -f 2 -d '"'
+  register: CURRENT_DC
 
-# Set up a basic client app on that node selected from above.
+- name: Setup CURRENT_DC_NORM 
+  become: true
+  ansible.builtin.shell:
+    cmd: grep -h '^datacenter' /etc/consul.d/*.hcl | cut -f 2 -d '"' | tr '-' '_'
+  register: CURRENT_DC_NORM
+
+- name: Setup TGW_TEST_APP_NODE_IP
+  become: true
+  ansible.builtin.shell:
+    cmd: echo "{{ hostvars[groups[CURRENT_DC_NORM.stdout + '_mgw'][0]]['ansible_facts']['default_ipv4']['address'] }}"
+  register: TGW_TEST_APP_NODE_IP
+
+# - debug: msg="{{ TGW_TEST_APP_NODE_IP }}"
+
+- name: rm -rf /opt/consul/custom-apps/tgw on all Consul nodes
+  become: true
+  ansible.builtin.shell:
+    cmd: rm -rf /opt/consul/custom-apps/tgw
+  when: (CONSUL_VM_TGW_ENABLED|bool and inventory_hostname in TGW_TEST_APP_NODES)
+
+- name: Create /opt/consul/custom-apps/tgw on all Consul nodes
+  become: true
+  ansible.builtin.file:
+    recurse: true
+    path: '/opt/consul/custom-apps/tgw/certs'
+    state: directory
+  when: (CONSUL_VM_TGW_ENABLED|bool and ((inventory_hostname in TGW_TEST_APP_NODES) or (inventory_hostname in TGW_NODES)))
+
+- name: Transfer Terminating gateway custom python application files to the /opt/consul/custom-apps/tgw/ folder
+  become: true
+  template:
+    src: "{{ item }}"
+    dest: /opt/consul/custom-apps/tgw/{{ item | basename | regex_replace('\.j2$', '') }}
+  with_fileglob:
+    - "{{ playbook_dir }}/roles/terminating-gateways/templates/*.py.j2"
+  when: (CONSUL_VM_TGW_ENABLED|bool and inventory_hostname in TGW_TEST_APP_NODES)
+
+- name: Transfer Terminating gateway custom python application files to the /opt/consul/custom-apps/tgw/ folder
+  become: true
+  template:
+    src: "{{ playbook_dir }}/roles/terminating-gateways/templates/service-artifacts/systemd-tgw-app@.service.j2"
+    dest: "/lib/systemd/system/tgw-app@.service"
+  when: (CONSUL_VM_TGW_ENABLED|bool and inventory_hostname in TGW_TEST_APP_NODES)
+
+- name: Generate Server and Client certificates so we can use them 
+  become: true
+  ansible.builtin.shell:
+    chdir: '/opt/consul/custom-apps/tgw/certs'
+    cmd: >
+      openssl req -x509 -newkey rsa:4096 -sha256 -days 365 -nodes \
+       -keyout venus-srv.com.key -out venus-srv.com.crt -subj "/CN=venus-servers.com" \
+       -addext "subjectAltName=DNS:venus-srv.com,DNS:*.venus-srv.com,IP:$(hostname -I)" 2>/dev/null \
+       &&  \
+       openssl req -x509 -newkey rsa:4096 -sha256 -days 365 -nodes \
+       -keyout venus-cli.com.key -out venus-cli.com.crt -subj "/CN=venus-clients.com" \
+       -addext "subjectAltName=DNS:venus-cli.com,DNS:*.venus-srv.com,IP:192.168.2.3" 2>/dev/null
+  when: (CONSUL_VM_TGW_ENABLED|bool and inventory_hostname in TGW_TEST_APP_NODES)
+
+- name: Compress /opt/consul/custom-apps/tgw/certs/ directory
+  become: true
+  when: inventory_hostname in TGW_TEST_APP_NODES
+  community.general.archive:
+    path: '/opt/consul/custom-apps/tgw/certs/*'
+    dest: '/opt/consul/custom-apps/tgw/certs/tgw-app-tls.tgz'
+
+- name: Fetch the zipped tgw-app-tls.tgz file from the remote host to local
+  become: true
+  ansible.builtin.fetch:
+    flat: yes
+    src: '/opt/consul/custom-apps/tgw/certs/tgw-app-tls.tgz'
+    dest: "{{ playbook_dir }}/output/tls/vm-{{ item.dc }}/tgw-app-tls.tgz"
+  when: 
+    - item.enabled and item.group in group_names
+  loop:
+    - {'group': DC1_MGW, 'dc': "{{DC1_NAME}}", 'enabled': True}
+    - {'group': DC2_MGW, 'dc': "{{DC2_NAME}}", 'enabled': CONSUL_VM_DC2_ENABLED|bool}
+    - {'group': DC3_MGW, 'dc': "{{DC3_NAME}}", 'enabled': CONSUL_VM_DC3_ENABLED|bool}
+
+- name: Create /opt/consul/tgw/tls/ on each of the nodes running the terminating gateways ref- {{TGW_NODES}}
+  become: true
+  when: inventory_hostname in TGW_NODES
+  ansible.builtin.file:
+    recurse: true
+    path: '/opt/consul/tgw/tls/'
+    state: directory 
+
+- name: Extract the tgw-app-tls.tgz files in the remote /opt/consul/tgw/tls/ directory
+  become: true
+  ansible.builtin.unarchive:
+    copy: true
+    src: "{{ playbook_dir }}/output/tls/vm-{{ item.dc }}/tgw-app-tls.tgz"
+    dest: "/opt/consul/tgw/tls/"
+  when: 
+    - item.enabled 
+    - ("{{item.group}}" in group_names)
+  loop:
+    - {'group': DC1_MGMT, 'dc': "{{DC1_NAME}}", 'enabled': True}
+    - {'group': DC2_MGMT, 'dc': "{{DC2_NAME}}", 'enabled': CONSUL_VM_DC2_ENABLED|bool}
+    - {'group': DC3_MGMT, 'dc': "{{DC3_NAME}}", 'enabled': CONSUL_VM_DC3_ENABLED|bool}
+ 
+- name: Start the custom terminating gateway test applications on {{ TGW_TEST_APP_NODES }}
+  become: true
+  when: (CONSUL_VM_TGW_ENABLED|bool and inventory_hostname in TGW_TEST_APP_NODES)
+  ansible.builtin.systemd_service:
+    name: "tgw-app@{{ item }}"
+    state: restarted
+  with_items:
+    - "count-mtls"
+    - "count-tls"
+    - "count"
+
+- name: Generate a service token for the tgw-count custom app.
+  when: CONSUL_VM_TLS_ENABLED|bool and inventory_hostname in TGW_NODES
+  become: true
+  ansible.builtin.shell:
+    cmd: . ~/.bashrc 2>/dev/null && consul acl token create -service-identity=tgw-app-count:$(grep -h '^datacenter' /etc/consul.d/*.hcl | cut -f 2 -d '"') | grep ^SecretID | tr -d ' ' | awk -F ':' '{print $2}'
+  register: tgw_gw_count_app_token
+
+- name: Generate a service token for the tgw-count-tls custom app.
+  when: CONSUL_VM_TLS_ENABLED|bool and inventory_hostname in TGW_NODES
+  become: true
+  ansible.builtin.shell:
+    cmd: . ~/.bashrc 2>/dev/null && consul acl token create -service-identity=tgw-app-count-tls:$(grep -h '^datacenter' /etc/consul.d/*.hcl | cut -f 2 -d '"') | grep ^SecretID | tr -d ' ' | awk -F ':' '{print $2}'
+  register: tgw_gw_count_tls_app_token
+
+- name: Generate a service token for the tgw-count-mtls custom app.
+  when: CONSUL_VM_TLS_ENABLED|bool and inventory_hostname in TGW_NODES
+  become: true
+  ansible.builtin.shell:
+    cmd: . ~/.bashrc 2>/dev/null && consul acl token create -service-identity=tgw-app-count-mtls:$(grep -h '^datacenter' /etc/consul.d/*.hcl | cut -f 2 -d '"') | grep ^SecretID | tr -d ' ' | awk -F ':' '{print $2}'
+  register: tgw_gw_count_mtls_app_token  
+
+- name: Compress /opt/consul/custom-apps/tgw/certs/ directory
+  become: true
+  community.general.archive:
+    path: '/opt/consul/custom-apps/tgw/certs/*'
+    dest: '/opt/consul/custom-apps/tgw/certs/tgw-tls.tgz'
+  when: (CONSUL_VM_TLS_ENABLED|bool and inventory_hostname in TGW_TEST_APP_NODES)
+
+- name: Make local directory that we can then use to transfer to other remote servers - for {{ DC1_NAME }}
+  delegate_to: localhost
+  ansible.builtin.file:
+    recurse: true
+    path: 'output/tls/tgw-{{ DC1_NAME }}'
+    state: directory
+  when: (CONSUL_VM_TLS_ENABLED|bool and inventory_hostname in DC1_MGW)
+
+- name: Make local directory that we can then use to transfer to other remote servers - for {{ DC2_NAME }}
+  delegate_to: localhost
+  ansible.builtin.file:
+    recurse: true
+    path: 'output/tls/tgw-{{ DC2_NAME }}'
+    state: directory
+  when: (CONSUL_VM_TLS_ENABLED|bool and CONSUL_VM_DC2_ENABLED|bool and inventory_hostname in DC2_MGW)
+
+- name: Make local directory that we can then use to transfer to other remote servers - for {{ DC3_NAME }}
+  delegate_to: localhost
+  ansible.builtin.file:
+    recurse: true
+    path: 'output/tls/tgw-{{ DC3_NAME }}'
+    state: directory
+  when: (CONSUL_VM_TLS_ENABLED|bool and CONSUL_VM_DC3_ENABLED|bool and inventory_hostname in DC3_MGW)
+
+- name: Fetch the zipped tls file from the remote host to local - for {{ DC1_NAME }}
+  become: true
+  ansible.builtin.fetch:
+    flat: yes
+    src: "/opt/consul/custom-apps/tgw/certs/tgw-tls.tgz"
+    dest: "{{ playbook_dir }}/output/tls/tgw-{{ DC1_NAME }}/"
+  when: (CONSUL_VM_TLS_ENABLED|bool and inventory_hostname in groups[DC1_MGW])
+
+- name: Fetch the zipped tls file from the remote host to local - for {{ DC2_NAME }}
+  become: true
+  ansible.builtin.fetch:
+    flat: yes
+    src: "/opt/consul/custom-apps/tgw/certs/tgw-tls.tgz"
+    dest: "{{ playbook_dir }}/output/tls/tgw-{{ DC2_NAME }}/"
+  when: (CONSUL_VM_TLS_ENABLED|bool and CONSUL_VM_DC2_ENABLED|bool and inventory_hostname in groups[DC2_MGW])
 
 
-# Generate self signed certificates for servers and clients
-# cd /opt/consul/tls/
-# openssl req -x509 -newkey rsa:4096 -sha256 -days 365 -nodes -keyout venus-srv.com.key -out venus-srv.com.crt -subj "/CN=venus-servers.com"   -addext "subjectAltName=DNS:venus-srv.com,DNS:*.venus-srv.com,IP:10.0.0.2"
-# openssl req -x509 -newkey rsa:4096 -sha256 -days 365 -nodes -keyout venus-cli.com.key -out venus-cli.com.crt -subj "/CN=venus-clients.com"   -addext "subjectAltName=DNS:venus-cli.com,DNS:*.venus-srv.com,IP:192.168.2.3"
+- name: Fetch the zipped tls file from the remote host to local - for {{ DC3_NAME }}
+  become: true
+  ansible.builtin.fetch:
+    flat: yes
+    src: "/opt/consul/custom-apps/tgw/certs/tgw-tls.tgz"
+    dest: "{{ playbook_dir }}/output/tls/tgw-{{ DC3_NAME }}/"
+  when: (CONSUL_VM_TLS_ENABLED|bool and CONSUL_VM_DC3_ENABLED|bool and inventory_hostname in groups[DC3_MGW])
 
 
-# Set up a TLS based client app on that node.
+- name: Extract the files in the remote /opt/consul/custom-apps/tgw/certs/ directory - for {{ DC1_NAME }}
+  become: true
+  ansible.builtin.unarchive:
+    copy: true
+    src: "{{ playbook_dir }}/output/tls/tgw-{{ DC1_NAME }}/tgw-tls.tgz"
+    dest: "/opt/consul/custom-apps/tgw/certs/"
+  when: (CONSUL_VM_TLS_ENABLED|bool and inventory_hostname in groups[DC1_MGMT])
+
+- name: Extract the files in the remote /opt/consul/custom-apps/tgw/certs/ directory - for {{ DC2_NAME }}
+  become: true
+  ansible.builtin.unarchive:
+    copy: true
+    src: "{{ playbook_dir }}/output/tls/tgw-{{ DC2_NAME }}/tgw-tls.tgz"
+    dest: "/opt/consul/custom-apps/tgw/certs/"
+  when: (CONSUL_VM_TLS_ENABLED|bool and CONSUL_VM_DC2_ENABLED|bool and inventory_hostname in groups[DC2_MGMT])
+
+- name: Extract the files in the remote /opt/consul/custom-apps/tgw/certs/ directory - for {{ DC3_NAME }}
+  become: true
+  ansible.builtin.unarchive:
+    copy: true
+    src: "{{ playbook_dir }}/output/tls/tgw-{{ DC3_NAME }}/tgw-tls.tgz"
+    dest: "/opt/consul/custom-apps/tgw/certs/"
+  when: (CONSUL_VM_TLS_ENABLED|bool and CONSUL_VM_DC3_ENABLED|bool and inventory_hostname in groups[DC3_MGMT])
+
+# - debug: 
+#     msg: "{{ vars }}"
+
+- name: Transfer external service definition for each of the external services that will be interfaced with the tgw. - {{TGW_NODES}}  - {{DC1_CLI}}
+  become: true
+  template:
+    src: "{{ playbook_dir }}/roles/terminating-gateways/templates/service-artifacts/consul-external-registration.json.j2"
+    dest: "/root/tgw-app-{{item.service}}.json"
+  when: 
+    - inventory_hostname in TGW_NODES
+  loop: 
+    - {'service': 'count-mtls', 'port': '{{CONSUL_TGW_COUNTING_MTLS_PORT}}' }
+    - {'service': 'count-tls', 'port': '{{CONSUL_TGW_COUNTING_TLS_PORT}}' }
+    - {'service': 'count', 'port': '{{CONSUL_TGW_COUNTING_PORT}}' }
+
+- name: Set group and owner to Consul over /opt/consul in all consul_nodes
+  become: true
+  file: dest=/opt/consul owner=consul group=consul recurse=yes
+
+- name: Register the external services into Consul.
+  become: true
+  ansible.builtin.shell:
+    cmd: . ~/.bashrc 2>/dev/null && curl -sk -X PUT -H "X-Consul-Token:${CONSUL_HTTP_TOKEN}" -d@/root/tgw-app-{{item}}.json $CONSUL_HTTP_ADDR/v1/catalog/register
+  when: 
+    - inventory_hostname in TGW_NODES
+  loop: 
+    - 'count-mtls'
+    - 'count-tls'
+    - 'count'
+
+- name: Install the latest consul-esm package
+  become: true
+  when: inventory_hostname in TGW_NODES
+  ansible.builtin.apt:
+    name: consul-esm
+    state: present
+
+- name: Transfer the esm-policy that we will use to create a token to be used in the ESM config
+  become: true
+  when: inventory_hostname in TGW_NODES and CONSUL_VM_ACL_ENABLED|bool 
+  template:
+    src: "{{ playbook_dir }}/roles/terminating-gateways/templates/esm-policy.hcl.j2"
+    dest: "/root/esm-policy.hcl"
+
+- name: Create a policy for ESM and then a token using that policy. This will eventually be used in the esm-config file
+  become: true
+  when: inventory_hostname in TGW_NODES and CONSUL_VM_ACL_ENABLED|bool 
+  ansible.builtin.shell:
+    cmd: >
+      . ~/.bashrc 2>/dev/null \
+      && (consul acl policy create \
+          {% if 'ent' in CONSUL_VM_VERSION %} -partition "default" -namespace "default" {% endif %} \
+          -name "esm-{{CURRENT_DC.stdout}}-policy" -rules @/root/esm-policy.hcl -description "ESM {{CURRENT_DC.stdout}} policy" || echo "ignore if it already exists") \
+      && consul acl token create \
+          {% if 'ent' in CONSUL_VM_VERSION %} -partition "default" -namespace "default" {% endif %}  \
+          -description "ESM Token" -policy-name "esm-{{CURRENT_DC.stdout}}-policy" > /root/esm-token.txt
+
+- name: Register the ESM token so we can use it in the next step when ESM config is being set up.
+  become: true
+  when: inventory_hostname in TGW_NODES and CONSUL_VM_ACL_ENABLED|bool 
+  ansible.builtin.shell:
+    cmd: cat /root/esm-token.txt | grep '^SecretID' | tr -d ' ' | awk -F ':' '{print $2}'
+  register: esm_token
+
+- name: Transfer esm-config that we will use to start up the agent.
+  become: true
+  template:
+    src: "{{ playbook_dir }}/roles/terminating-gateways/templates/esm-config.hcl.j2"
+    dest: "/opt/consul/esm-config.hcl"
+  when: inventory_hostname in TGW_NODES
+
+- name: Transfer esm-env that we will use to start up the agent.
+  become: true
+  template:
+    src: "{{ playbook_dir }}/roles/terminating-gateways/templates/esm.env.j2"
+    dest: "/etc/consul.d/consul-esm.env"
+  when: inventory_hostname in TGW_NODES
+
+- name: Transfer the ESM startup script to {{TGW_NODES}}
+  become: true
+  template:
+    src: "{{ playbook_dir }}/roles/terminating-gateways/templates/consul-esm.service.j2"
+    dest: "/lib/systemd/system/consul-esm.service"
+  when: inventory_hostname in TGW_NODES
+
+- name: Just force systemd to reread configs (2.4 and above)
+  become: true
+  ansible.builtin.shell:
+    cmd: systemctl daemon-reload
+  when: inventory_hostname in TGW_NODES
+
+- name: Set group and owner to Consul over /etc/consul.d 
+  become: true
+  file: dest=/etc/consul.d owner=consul group=consul recurse=yes
+  when: inventory_hostname in TGW_NODES
+
+- name: Set group and owner to Consul over /opt/consul
+  become: true
+  file: dest=/opt/consul owner=consul group=consul recurse=yes
+  when: inventory_hostname in TGW_NODES
+
+- name: Restart the consul-esm service in {{TGW_NODES}}
+  become: true
+  when: inventory_hostname in TGW_NODES
+  ansible.builtin.systemd_service:
+    name: consul-esm
+    state: restarted
+
+- name: Set up Terminating gateway config entries for the 3 services in this DC.
+  become: true
+  template:
+    src: "{{playbook_dir}}/roles/terminating-gateways/templates/service-artifacts/config-entries/count-tgw.hcl.j2"
+    dest: "/root/{{item}}-tgw-config-entry.hcl"
+  when: 
+    - inventory_hostname in TGW_NODES
+  loop: 
+    - 'count-mtls'
+    - 'count-tls'
+    - 'count'
+
+- name: Copy over the Terminating gateway service startup files
+  become: true
+  template:
+    src: "{{playbook_dir}}/roles/terminating-gateways/templates/systemd-services/tgw@.service.j2"
+    dest: "/lib/systemd/system/tgw@.service"
+  when: inventory_hostname in TGW_NODES
 
 
-# Set up a mTLS based client app on that node.
+# - name: Template copy the Service registration entry to TGW_NODES
 
-# Set up a TGW that can handle all the clients from above.
+# - name: Register the external services at the TGW_NODES using the tokens generated from above if ACL is also enabled 
 
-# Set up a TGW o
+# - name: Template copy the TGW config entry for each of the DCs 
+
+# - name: Add the config entry using the output file from the above operation.
+
+# - name: Start the terminating gateways on the TGW_NODES

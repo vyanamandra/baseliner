@@ -1,0 +1,11 @@
+instance_id = "{{ vars['ansible_host'] | to_uuid }}"
+consul_service = "consul-{{CURRENT_DC.stdout}}-esm"
+consul_kv_path = "consul-{{CURRENT_DC.stdout}}-esm/"
+external_node_meta {
+    "external-node" = "true"
+}
+datacenter = "{{CURRENT_DC.stdout}}"
+
+{% if CONSUL_VM_ACL_ENABLED|bool %}
+token = "{{ esm_token.stdout }}"
+{% endif %}

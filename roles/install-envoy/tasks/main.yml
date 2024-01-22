@@ -17,7 +17,7 @@
   become: true
   when: ('consul_nodes' in group_names)
   ansible.builtin.shell:
-    cmd: mv ~/.func-e/versions/1.25.11/bin/envoy /usr/local/bin/envoy
+    cmd: mv ~/.func-e/versions/{{ CONSUL_ENVOY_VERSION }}/bin/envoy /usr/local/bin/envoy
 
 - name: Check envoy version
   become: true

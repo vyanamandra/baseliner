@@ -1,2 +1,21 @@
 ---
 # vars file for terminating-gateways
+
+DC1_NAME: "{{ vars['CONSUL_VM_DC1_DATACENTER'] }}"
+DC1_NORM: "{{ DC1_NAME | replace('-', '_') }}"
+DC1_MGW: "{{ DC1_NORM }}_mgw"
+DC1_MGMT: "{{ DC1_NORM }}_mgmt"
+DC1_CLI: "{{ groups[DC1_NORM + '_clients'] }}"
+
+DC2_NAME: "{{ vars['CONSUL_VM_DC2_DATACENTER'] }}"
+DC2_NORM: "{{ DC2_NAME | replace('-', '_') }}"
+DC2_MGW: "{{ DC2_NORM }}_mgw"
+DC2_MGMT: "{{ DC2_NORM }}_mgmt"
+
+DC3_NAME: "{{ vars['CONSUL_VM_DC3_DATACENTER'] }}"
+DC3_NORM: "{{ DC3_NAME | replace('-', '_') }}"
+DC3_MGW: "{{ DC3_NORM }}_mgw"
+DC3_MGMT: "{{ DC3_NORM }}_mgmt"
+
+TGW_TEST_APP_NODES: "{{ groups[DC1_MGW] + (groups[DC2_MGW] if (CONSUL_VM_DC2_ENABLED|bool) else []) + (groups[DC3_MGW] if (CONSUL_VM_DC3_ENABLED|bool) else []) }}"
+TGW_NODES: "{{ groups[DC1_MGMT] + (groups[DC2_MGMT] if (CONSUL_VM_DC2_ENABLED|bool) else []) + (groups[DC3_MGMT] if (CONSUL_VM_DC3_ENABLED|bool) else []) }}"

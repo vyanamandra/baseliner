@@ -1,0 +1,16 @@
+# /lib/systemd/system/tgw@.service
+[Unit]
+Description=Terminating Gateway to start TGW for each of the apps
+After=network.target 
+AssertPathExists=/opt/consul/custom-apps/tgw
+AssertPathIsDirectory=/opt/consul/custom-apps/tgw/certs
+
+[Service]
+Type=simple
+EnvironmentFile=/opt/consul/systemctl-service-configs/tgw-{{item}}.env
+ExecStart=consul connect envoy -gateway=mesh -register -expose-servers -service "${GATEWAY_SERVICE_NAME}" -address "${GATEWAY_SERVICE_PRIV_IP_PORT}" -wan-address "${GATEWAY_SERVICE_PUB_IP_PORT}" -token="${GATEWAY_SERVICE_TOKEN_ID}"
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

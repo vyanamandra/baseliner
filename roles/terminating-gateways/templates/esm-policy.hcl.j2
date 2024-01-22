@@ -1,0 +1,25 @@
+{% if "ent" in CONSUL_VM_VERSION %}
+namespace_prefix "" {
+  acl = "read"
+}
+{% endif %}
+
+agent_prefix "" {
+  policy = "read"
+}
+
+key_prefix "consul-{{CURRENT_DC.stdout}}-esm/" {
+  policy = "write"
+}
+
+node_prefix "" {
+  policy = "write"
+}
+
+service_prefix "" {
+  policy = "write"
+}
+
+session_prefix "" {
+   policy = "write"
+}

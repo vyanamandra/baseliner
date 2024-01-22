@@ -1,0 +1,24 @@
+Kind = "terminating-gateway"
+Name = "{{CURRENT_DC.stdout}}-{{item}}-tgw"
+
+{% if "ent" in CONSUL_VM_VERSION %}
+Namespace = "default"
+{% endif %}
+
+Services = [
+  {
+    Name = "{{CURRENT_DC.stdout}}-ext-{{item}}"
+    {% if "ent" in CONSUL_VM_VERSION %}
+    Namespace = "default"
+    {% endif %}
+
+    {% if "tls" in item %}
+    CAFile = "/opt/consul/tgw/tls/venus-srv.com.crt"
+    {% if "mtls" in item %}
+    CertFile = "/opt/consul/tgw/tls/venus-cli.com.crt"
+    KeyFile = "/opt/consul/tgw/tls/venus-cli.com.key"
+    {% endif %}
+    {% endif %}
+  }
+]
+

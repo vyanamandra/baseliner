@@ -81,14 +81,6 @@
     dest: "/opt/consul/tls/"
   when: (CONSUL_VM_TLS_ENABLED|bool and DC_NODES in group_names)
 
-- name: Set group and owner to Consul over /etc/consul.d 
-  become: true
-  file: dest=/etc/consul.d owner=consul group=consul recurse=yes
-
-- name: Set group and owner to Consul over /opt/consul
-  become: true
-  file: dest=/opt/consul owner=consul group=consul recurse=yes
-
 #- debug: var=inventory_hostname
 
 #- debug: var=group_names
@@ -142,6 +134,14 @@
   when: DC_NODES in group_names
   ansible.builtin.shell:
     cmd: for f in $(ls /etc/consul.d/*.hcl); do sed -i "s/'/\"/g" "${f}"; done
+
+- name: Set group and owner to Consul over /etc/consul.d 
+  become: true
+  file: dest=/etc/consul.d owner=consul group=consul recurse=yes
+
+- name: Set group and owner to Consul over /opt/consul
+  become: true
+  file: dest=/opt/consul owner=consul group=consul recurse=yes
 
 - name: Restart the consul service in the servers
   become: true

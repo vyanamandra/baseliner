@@ -1,61 +1,61 @@
 ---
-- name: Starting the installation
-  hosts: localhost
-  tasks:
-  - name: Set default values for variables
-    ansible.builtin.include_vars:
-      dir: env-defaults/
-      extensions:
-        - 'yml'
+# - name: Starting the installation
+#   hosts: localhost
+#   tasks:
+#   - name: Set default values for variables
+#     ansible.builtin.include_vars:
+#       dir: env-defaults/
+#       extensions:
+#         - 'yml'
 
-  - name: Include all .yml files from env-selection/
-    ansible.builtin.include_vars:
-      dir: env-selection/
-      extensions:
-        - 'yml'
+#   - name: Include all .yml files from env-selection/
+#     ansible.builtin.include_vars:
+#       dir: env-selection/
+#       extensions:
+#         - 'yml'
 
-  - name: Provision Security groups for the cloud providers where needed.
-    include_role:
-      name: 'roles/provision-security-groups'
-    when: CONSUL_VM_DC1_PROVISION | bool or CONSUL_VM_DC3_PROVISION | bool or CONSUL_VM_DC3_PROVISION | bool
+#   - name: Provision Security groups for the cloud providers where needed.
+#     include_role:
+#       name: 'roles/provision-security-groups'
+#     when: CONSUL_VM_DC1_PROVISION | bool or CONSUL_VM_DC3_PROVISION | bool or CONSUL_VM_DC3_PROVISION | bool
 
-  - name: Provision nodes for Consul DC1
-    include_role:
-      name: 'roles/provision-nodes'
-    when: CONSUL_VM_DC1_PROVISION | bool
-    vars:
-        DC_ROLE: "consul"
-        DC: "DC1"
+#   - name: Provision nodes for Consul DC1
+#     include_role:
+#       name: 'roles/provision-nodes'
+#     when: CONSUL_VM_DC1_PROVISION | bool
+#     vars:
+#         DC_ROLE: "consul"
+#         DC: "DC1"
 
-  - name: Provision nodes for Consul DC2 if required
-    include_role:
-      name: 'roles/provision-nodes'
-    when: CONSUL_VM_DC2_PROVISION | bool
-    vars:
-        DC_ROLE: "consul"
-        DC: "DC2" 
+#   - name: Provision nodes for Consul DC2 if required
+#     include_role:
+#       name: 'roles/provision-nodes'
+#     when: CONSUL_VM_DC2_PROVISION | bool
+#     vars:
+#         DC_ROLE: "consul"
+#         DC: "DC2" 
 
-  - name: Provision nodes for Consul DC3 if required
-    include_role:
-      name: 'roles/provision-nodes'
-    when: CONSUL_VM_DC3_PROVISION | bool
-    vars:
-       DC_ROLE: "consul"
-       DC: "DC3" 
+#   - name: Provision nodes for Consul DC3 if required
+#     include_role:
+#       name: 'roles/provision-nodes'
+#     when: CONSUL_VM_DC3_PROVISION | bool
+#     vars:
+#        DC_ROLE: "consul"
+#        DC: "DC3" 
   
 
-  - name: Add all known hostips from the inventory file to the security group of all cloud providers.
-    include_role:
-      name: 'roles/add-hostips-to-security-groups'
-    when: CONSUL_VM_DC1_PROVISION | bool or CONSUL_VM_DC2_PROVISION | bool or CONSUL_VM_DC3_PROVISION | bool
+#   - name: Add all known hostips from the inventory file to the security group of all cloud providers.
+#     include_role:
+#       name: 'roles/add-hostips-to-security-groups'
+#     when: CONSUL_VM_DC1_PROVISION | bool or CONSUL_VM_DC2_PROVISION | bool or CONSUL_VM_DC3_PROVISION | bool
 
 
-  - name: Wait for SSH to come up on the newly provisioned nodes
-    local_action: wait_for
-                  host={{ hostvars[item]['ansible_host'] }}
-                  port=22
-                  state=started
-    with_items: "{{ groups['consul_nodes'] }}"
+#   - name: Wait for SSH to come up on the newly provisioned nodes
+#     local_action: wait_for
+#                   host={{ hostvars[item]['ansible_host'] }}
+#                   port=22
+#                   state=started
+#     with_items: "{{ groups['consul_nodes'] }}"
 
 
 - name: Install required packages
@@ -73,51 +73,56 @@
       extensions:
         - 'yml'
 
-  - name: Install Consul binary all provisioned nodes for Consul
-    include_role:
-      name: 'roles/install-consul'
-    when: CONSUL_VM_DC1_ENABLED | bool
+  # - name: Install Consul binary all provisioned nodes for Consul
+  #   include_role:
+  #     name: 'roles/install-consul'
+  #   when: CONSUL_VM_DC1_ENABLED | bool
 
-  - name: Install Envoy binary on all provisioned nodes, required only on agent nodes running sidecars
-    include_role:
-      name: 'roles/install-envoy'
-    when: CONSUL_VM_DC1_ENABLED | bool
+  # - name: Install Envoy binary on all provisioned nodes, required only on agent nodes running sidecars
+  #   include_role:
+  #     name: 'roles/install-envoy'
+  #   when: CONSUL_VM_DC1_ENABLED | bool
 
-  - name: Install Python 3.x and virtualenv on all provisioned nodes, required only on nodes running custom python apps
-    include_role:
-      name: 'roles/install-python'
-    when: CONSUL_VM_DC1_ENABLED | bool
+  # - name: Install Python 3.x and virtualenv on all provisioned nodes, required only on nodes running custom python apps
+  #   include_role:
+  #     name: 'roles/install-python'
+  #   when: CONSUL_VM_DC1_ENABLED | bool
 
-  - name: Setup consul server agent configs in DC1, client agent configs and create required dirs
-    include_role:
-      name: 'roles/setup-consul-config'
-    when: CONSUL_VM_DC1_ENABLED | bool
-    vars:
-        DC: "DC1"
+  # - name: Setup consul server agent configs in DC1, client agent configs and create required dirs
+  #   include_role:
+  #     name: 'roles/setup-consul-config'
+  #   when: CONSUL_VM_DC1_ENABLED | bool
+  #   vars:
+  #       DC: "DC1"
 
-  - name: Setup consul server agent configs in DC2, client agent configs and create required dirs
-    include_role:
-      name: 'roles/setup-consul-config'
-    when: CONSUL_VM_DC2_ENABLED | bool
-    vars:
-        DC: "DC2"
+  # - name: Setup consul server agent configs in DC2, client agent configs and create required dirs
+  #   include_role:
+  #     name: 'roles/setup-consul-config'
+  #   when: CONSUL_VM_DC2_ENABLED | bool
+  #   vars:
+  #       DC: "DC2"
 
-  - name: Setup consul server agent configs in DC3, client agent configs and create required dirs
-    include_role:
-      name: 'roles/setup-consul-config'
-    when: CONSUL_VM_DC3_ENABLED | bool
-    vars:
-        DC: "DC3"
+  # - name: Setup consul server agent configs in DC3, client agent configs and create required dirs
+  #   include_role:
+  #     name: 'roles/setup-consul-config'
+  #   when: CONSUL_VM_DC3_ENABLED | bool
+  #   vars:
+  #       DC: "DC3"
 
-  - name: Connect the DCs in a Traditional WAN Federation (Simple Mesh - consul join -wan)
-    include_role:
-      name: 'roles/consul-join-clusters-traditional'
-    when: CONSUL_TRADITIONAL_MESH_ENABLED | bool
+  # - name: Connect the DCs in a Traditional WAN Federation (Simple Mesh - consul join -wan)
+  #   include_role:
+  #     name: 'roles/consul-join-clusters-traditional'
+  #   when: CONSUL_TRADITIONAL_MESH_ENABLED | bool
     
-  - name: Connect the DCs using a Mesh Gateway (with mode local)
+  # - name: Connect the DCs using a Mesh Gateway (with mode local)
+  #   include_role:
+  #     name: 'roles/consul-join-clusters-gateway'
+  #   when: CONSUL_MESH_GATEWAY_ENABLED | bool 
+
+  - name: Setup Terminating gateway and custom apps.
     include_role:
-      name: 'roles/consul-join-clusters-gateway'
-    when: CONSUL_MESH_GATEWAY_ENABLED | bool
+      name: 'roles/terminating-gateways'
+    when: CONSUL_VM_TGW_ENABLED | bool
 
 ##  - name: Install Venus Python Apps and register those with Consul.
 ##    include_role:
